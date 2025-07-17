@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
-import {useSelector} from 'react-redux';
 import {RFPercentage} from 'react-native-responsive-fontsize';
 import {
   widthPercentageToDP as wp,

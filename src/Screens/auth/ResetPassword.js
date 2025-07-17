@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import authApi from '../../services/authApi';
 import { useAlert } from '../../Providers/AlertContext';
 import { SCREENS } from '../../Constants/Screens';
-import CustomButton from '../../Components/CustomButton';
+import CustomButton from '../../components/Buttons/customButton';
 
 const ResetPassword = ({ navigation }) => {
   const [email, setEmail] = useState('');

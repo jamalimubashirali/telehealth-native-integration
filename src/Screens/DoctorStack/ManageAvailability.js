@@ -69,10 +69,17 @@ const ManageAvailability = ({navigation}) => {
     }));
   };
 
+  const { role } = useSelector(store => store.User.user);
+  const doctorId = role === 'doctor' ? useSelector(store => store.User.user.id) : null;
+  if (!doctorId) {
+    showAlert('You are not a doctor', 'error');
+    return;
+  }
+
   const fetchSlots = async (date) => {
     setLoadingSlots(true);
     try {
-      const res = await appointmentApi.getAvailableSlots(/* doctorId */, date);
+      const res = await appointmentApi.getAvailableSlots(doctorId, date);
       setSlots(res.data.slots || []);
     } catch (err) {
       showAlert(err.response?.data?.message || 'Failed to fetch slots', 'error');
