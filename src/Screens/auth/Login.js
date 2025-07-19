@@ -313,8 +313,10 @@ const Login = ({navigation, route}) => {
     try {
       const res = await authApi.login({ emailOrPhone: value, password });
       if (res.data && res.data.token && res.data.user) {
+        console.log("Reached Here");
         dispatch(loginUser({ user: res.data.user, userType: res.data.user.role }));
-        showAlert('Login successful', 'success');
+        console.log("Reached Here");
+        showAlert('Login success', 'success');
         navigation.dispatch(
           CommonActions.reset({
             index: 0,

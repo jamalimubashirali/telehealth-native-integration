@@ -98,7 +98,7 @@ export const register = async (req, res) => {
       text: `Your OTP for email verification is: ${otp}`,
       html: `<p>Your OTP for email verification is: <b>${otp}</b></p>`
     });
-    res.status(201).json({ success: true, data: null, message: 'User registered successfully. Please verify your email with the OTP sent.' });
+    res.status(201).json({ success: true, data: { name: user.name, email: user.email }, message: 'User registered successfully. Please verify your email with the OTP sent.' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -106,6 +106,7 @@ export const register = async (req, res) => {
 
 export const verifyEmail = async (req, res) => {
   try {
+    console.log('req.body', req.body);
     const { email, otp } = req.body;
     if (!email || !otp) {
       return res.status(400).json({ success: false, message: 'Email and OTP are required' });

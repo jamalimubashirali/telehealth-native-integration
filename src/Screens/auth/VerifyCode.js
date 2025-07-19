@@ -28,6 +28,8 @@ const VerifyCode = ({ navigation, route }) => {
     }
   };
 
+  console.log(otp);
+
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
       <Text>Enter OTP sent to your email</Text>

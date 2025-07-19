@@ -285,20 +285,20 @@ const DoctorAppointments = ({navigation}) => {
           <Text style={styles.emptyText}>Loading appointments...</Text>
         </View>
       ) : (
-        <FlatList
-          data={appointments[selectedTab]}
-          keyExtractor={item => item.id.toString()}
-          renderItem={({item}) => <AppointmentCard item={item} />}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                No {selectedTab} appointments found
-              </Text>
-            </View>
-          }
-        />
+      <FlatList
+        data={appointments[selectedTab]}
+        keyExtractor={item => item.id.toString()}
+        renderItem={({item}) => <AppointmentCard item={item} />}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              No {selectedTab} appointments found
+            </Text>
+          </View>
+        }
+      />
       )}
     </SafeAreaView>
   );

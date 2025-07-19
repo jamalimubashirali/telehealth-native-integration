@@ -451,6 +451,7 @@ const Signup = ({navigation, route}) => {
       //   showAlert(res.data.message || 'Sign up failed', 'error');
       // }
       if (res.data && res.data.success) {
+        console.log('res.data', res.data);
         setTimeout(() => {
           navigation.navigate(SCREENS.OTPSCREEN, {
             userType,

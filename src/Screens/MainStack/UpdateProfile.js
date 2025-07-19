@@ -224,9 +224,9 @@ const UpdateProfile = ({ navigation }) => {
                         // Add other fields as needed
                     };
                     await authApi.updateProfile(payload, token);
-                    showAlert('Profile Updated Successfully', 'success');
-                    setTimeout(() => {
-                        navigation.goBack();
+                showAlert('Profile Updated Successfully', 'success');
+                setTimeout(() => {
+                    navigation.goBack();
                     }, 1500);
                 } catch (err) {
                     showAlert(err.response?.data?.message || 'Profile update failed', 'error');

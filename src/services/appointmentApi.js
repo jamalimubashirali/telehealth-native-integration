@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'https://mrvwhr8v-5000.inc1.devtunnels.ms';
+const BASE_URL = 'https://c6zfxs18-5000.inc1.devtunnels.ms';
 
 const api = axios.create({
   baseURL: BASE_URL,

@@ -1,5 +1,5 @@
 'use client';
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,28 +8,29 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
-import {useNavigation, useRoute} from '@react-navigation/native';
-import {useSelector} from 'react-redux';
-import {Colors} from '../../Constants/themeColors';
-import {Fonts} from '../../Constants/Fonts';
-import {RFPercentage} from 'react-native-responsive-fontsize';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+import { Colors } from '../../Constants/themeColors';
+import { Fonts } from '../../Constants/Fonts';
+import { RFPercentage } from 'react-native-responsive-fontsize';
 import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
 import StackHeader from '../../components/Header/StackHeader';
 import CustomButton from '../../components/Buttons/customButton';
-import {SCREENS} from '../../Constants/Screens';
-import {useAlert} from '../../Providers/AlertContext';
+import { SCREENS } from '../../Constants/Screens';
+import { useAlert } from '../../Providers/AlertContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import authApi from '../../services/authApi';
 
 const OtpScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const {isDarkMode} = useSelector(store => store.theme);
-  const {showAlert} = useAlert();
+  const { isDarkMode } = useSelector(store => store.theme);
+  const { showAlert } = useAlert();
 
-  const {emailOrPhone, userType, userData} = route.params || {
+  const { email, userType, phone_no } = route.params || {
     emailOrPhone: 'user@example.com',
     userType: 'patient',
   };
@@ -82,22 +83,10 @@ const OtpScreen = () => {
     }
 
     try {
-      // Use your actual API endpoint
-      const response = await fetch(
-        'http://localhost:5000/api/auth/verify-email',
-        {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            email: emailOrPhone, // Your backend expects email
-            otp: otpCode,
-          }),
-        },
-      );
 
-      const data = await response.json();
-
-      if (data.success) {
+      const response = await authApi.verifyEmail({ email, otp: otpCode });
+      console.log('data', response.data);
+      if (response.data.success) {
         showAlert('Email verified successfully!', 'success');
         setTimeout(() => {
           if (userType === 'doctor') {
@@ -107,7 +96,7 @@ const OtpScreen = () => {
           }
         }, 1500);
       } else {
-        showAlert(data.message || 'Invalid OTP', 'error');
+        showAlert(response.data.message || 'Invalid OTP', 'error');
       }
     } catch (error) {
       console.error('OTP Verification Error:', error);
@@ -124,7 +113,7 @@ const OtpScreen = () => {
           'http://localhost:5000/api/auth/register',
           {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData), // Resend with original user data
           },
         );
@@ -256,7 +245,7 @@ const OtpScreen = () => {
         <Text style={styles.title}>Verify Your Email</Text>
         <Text style={styles.subtitle}>
           Enter the 6-digit verification code sent to{'\n'}
-          <Text style={styles.phoneNumber}>{emailOrPhone}</Text>
+          <Text style={styles.phoneNumber}>{email}</Text>
         </Text>
 
         <View style={styles.otpContainer}>

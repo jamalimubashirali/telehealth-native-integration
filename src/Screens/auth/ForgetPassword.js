@@ -89,7 +89,7 @@ const ForgetPassword = ({navigation}) => {
         try {
             await authApi.requestPasswordReset({ email: Email });
             showAlert('Reset code sent to your email', 'success');
-            setIndex(1); // Switch to verification screen
+      setIndex(1); // Switch to verification screen
         } catch (err) {
             showAlert(err.response?.data?.message || 'Failed to send reset code', 'error');
         } finally {
@@ -296,7 +296,7 @@ const ForgetPassword = ({navigation}) => {
     try {
         await authApi.resetPassword({ email: Email, otp: value, password });
         showAlert('Password reset successful', 'success');
-        setTimeout(() => {
+      setTimeout(() => {
             navigation.navigate(SCREENS.LOGIN);
         }, 1500);
     } catch (err) {
