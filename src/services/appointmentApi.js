@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getToken } from '../utils/tokenStorage';
 
 const BASE_URL = 'https://c6zfxs18-5000.inc1.devtunnels.ms';
 
@@ -7,31 +8,37 @@ const api = axios.create({
   timeout: 10000,
 });
 
+// Helper to get auth headers
+const authHeaders = async () => {
+  const token = await getToken();
+  return { Authorization: `Bearer ${token}` };
+};
+
 // Book Appointment (Patient)
-export const bookAppointment = async (data, token) => {
+export const bookAppointment = async (data) => {
   return api.post('/api/appointments', data, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: await authHeaders(),
   });
 };
 
 // Accept Appointment (Doctor)
-export const acceptAppointment = async (appointmentId, token) => {
+export const acceptAppointment = async (appointmentId) => {
   return api.put(`/api/appointments/${appointmentId}/accept`, {}, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: await authHeaders(),
   });
 };
 
 // Complete Appointment (Doctor)
-export const completeAppointment = async (appointmentId, data, token) => {
+export const completeAppointment = async (appointmentId, data) => {
   return api.put(`/api/appointments/${appointmentId}/complete`, data, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: await authHeaders(),
   });
 };
 
 // Cancel Appointment (Patient or Doctor)
-export const cancelAppointment = async (appointmentId, data, token) => {
+export const cancelAppointment = async (appointmentId, data) => {
   return api.put(`/api/appointments/${appointmentId}/cancel`, data, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: await authHeaders(),
   });
 };
 
@@ -41,16 +48,16 @@ export const getAvailableSlots = async (doctorId, date) => {
 };
 
 // Calendar Integration (Placeholder)
-export const getCalendarIntegration = async (token) => {
+export const getCalendarIntegration = async () => {
   return api.get('/api/calendar', {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: await authHeaders(),
   });
 };
 
 // Trigger Missed Appointments (Admin)
-export const triggerMissedAppointments = async (data, token) => {
+export const triggerMissedAppointments = async (data) => {
   return api.post('/api/appointments/missed', data, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: await authHeaders(),
   });
 };
 
@@ -60,9 +67,9 @@ export const getDoctorPublicProfile = async (doctorId) => {
 };
 
 // Admin audit log
-export const getAdminAuditLog = async (token) => {
+export const getAdminAuditLog = async () => {
   return api.get('/api/admin/audit-log', {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: await authHeaders(),
   });
 };
 

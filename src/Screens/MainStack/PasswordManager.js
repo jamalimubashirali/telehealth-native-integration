@@ -14,7 +14,6 @@ import { useAlert } from '../../Providers/AlertContext';
 
 const PasswordManager = ({navigation}) => {
   const { isDarkMode } = useSelector(store => store.theme);
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
     const { showAlert } = useAlert();
@@ -82,9 +81,7 @@ const PasswordManager = ({navigation}) => {
              navigation.goBack()
            }, 2500);
         }} />
-
       </View>
-
     </View>
   )
 }

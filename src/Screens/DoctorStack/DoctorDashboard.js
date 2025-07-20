@@ -24,15 +24,15 @@ import {SafeAreaView} from 'react-native';
 import {useLogout} from '../../utils/authUtils';
 import doctorApi from '../../services/doctorApi';
 import { useAlert } from '../../Providers/AlertContext';
+import { getToken } from '../../utils/tokenStorage';
 
 const DoctorDashboard = ({navigation}) => {
   const {isDarkMode} = useSelector(store => store.theme);
   const {User} = useSelector(store => store.auth);
   const logout = useLogout();
-  const { token } = useSelector(store => store.auth.User || {});
+  const { token } = getToken();
   const { showAlert } = useAlert();
   const [loading, setLoading] = useState(true);
-
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardStats, setDashboardStats] = useState({
     todayAppointments: 5,
@@ -44,6 +44,9 @@ const DoctorDashboard = ({navigation}) => {
     newPatients: 3, // New patients this week
     activePatients: 42, // Currently active patients
   });
+  const [todayAppointments, setTodayAppointments] = useState([]);
+  const [patientsTreated, setPatientsTreated] = useState([]);
+  const [availabilityStatus, setAvailabilityStatus] = useState('');
 
   const theme = isDarkMode ? Colors.darkTheme : Colors.lightTheme;
 
@@ -54,10 +57,42 @@ const DoctorDashboard = ({navigation}) => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const res = await doctorApi.getDoctorDashboard(token);
-      setDashboardStats(res.data.dashboardStats || {});
+      // Fetch dashboard stats
+      const dashboardRes = await doctorApi.getDoctorDashboard();
+      setDashboardStats(dashboardRes.data.dashboardStats || {});
+      setAvailabilityStatus(dashboardRes.data.dashboardStats?.availability || 'Unavailable');
+      // Fetch today's appointments
+      const upcomingRes = await doctorApi.getDoctorUpcomingAppointments();
+      // Filter today's appointments by date
+      const todayDate = new Date().toISOString().slice(0, 10);
+      const todays = (upcomingRes.data.appointments || []).filter(appt => {
+        const apptDate = new Date(appt.date).toISOString().slice(0, 10);
+        return apptDate === todayDate;
+      });
+      setTodayAppointments(todays);
+      // Fetch consultation history for patients treated
+      const historyRes = await doctorApi.getConsultationHistory();
+      const consultations = historyRes.data.appointments || [];
+      // Extract unique patients
+      const patientMap = {};
+      consultations.forEach(appt => {
+        if (appt.patient && appt.patient._id) {
+          if (!patientMap[appt.patient._id]) {
+            patientMap[appt.patient._id] = {
+              ...appt.patient,
+              visitCount: 1
+            };
+          } else {
+            patientMap[appt.patient._id].visitCount += 1;
+          }
+        }
+      });
+      setPatientsTreated(Object.values(patientMap));
     } catch (err) {
       showAlert(err.response?.data?.message || 'Failed to load dashboard', 'error');
+      setTodayAppointments([]);
+      setPatientsTreated([]);
+      setAvailabilityStatus('Unavailable');
     } finally {
       setLoading(false);
     }
@@ -305,15 +340,15 @@ const DoctorDashboard = ({navigation}) => {
         <View style={styles.availabilityContainer}>
           <View>
             <Text style={styles.availabilityText}>Availability Status</Text>
-            <Text style={styles.availabilityStatus}>Available</Text>
+            <Text style={styles.availabilityStatus}>{availabilityStatus}</Text>
           </View>
-          <CustomButton text="Go Offline" onPress={() => handleAvailability('offline')} />
+          <CustomButton text={availabilityStatus === 'Available' ? 'Go Offline' : 'Go Online'} onPress={() => handleAvailability(availabilityStatus === 'Available' ? 'offline' : 'online')} />
         </View>
 
         <View style={styles.statsContainer}>
           <StatCard
             title="Today's Appointments"
-            value={dashboardStats.todayAppointments}
+            value={dashboardStats.todayAppointments !== undefined ? dashboardStats.todayAppointments : 0}
             icon="calendar-today"
             color={theme.primaryColor}
             onPress={() => navigation.navigate(SCREENS.DOCTOR_APPOINTMENTS)}
@@ -321,8 +356,8 @@ const DoctorDashboard = ({navigation}) => {
 
           <StatCard
             title="Patient Analytics"
-            value={dashboardStats.totalPatients}
-            subtitle={`+${dashboardStats.newPatients} this week`}
+            value={dashboardStats.totalPatients !== undefined ? dashboardStats.totalPatients : 0}
+            subtitle={dashboardStats.newPatients !== undefined ? `+${dashboardStats.newPatients} this week` : 'No new patients this week'}
             icon="account-group"
             color={Colors.success}
             onPress={() =>
@@ -390,21 +425,53 @@ const DoctorDashboard = ({navigation}) => {
           />
         </View>
 
+        {/* Today's Appointments */}
         <Text style={styles.sectionTitle}>Today's Appointments</Text>
-        <View style={styles.appointmentCard}>
-          <View style={styles.appointmentHeader}>
-            <View>
-              <Text style={styles.patientName}>John Doe</Text>
-              <Text style={styles.appointmentTime}>10:00 AM</Text>
-              <Text style={styles.appointmentType}>Video Consultation</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.joinButton}
-              onPress={() => navigation.navigate(SCREENS.CALL)}>
-              <Text style={styles.joinButtonText}>Join Call</Text>
-            </TouchableOpacity>
+        {loading ? (
+          <View style={styles.appointmentCard}>
+            <Text style={styles.appointmentTime}>Loading appointments...</Text>
           </View>
-        </View>
+        ) : todayAppointments.length === 0 ? (
+          <View style={styles.appointmentCard}>
+            <Text style={styles.appointmentTime}>No appointments for today</Text>
+          </View>
+        ) : todayAppointments.map((appt, idx) => (
+          <View style={styles.appointmentCard} key={appt._id || idx}>
+            <View style={styles.appointmentHeader}>
+              <View>
+                <Text style={styles.patientName}>{appt.patient?.name || 'Patient'}</Text>
+                <Text style={styles.appointmentTime}>{appt.date ? new Date(appt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Time N/A'}</Text>
+                <Text style={styles.appointmentType}>{appt.type || appt.status || 'Consultation'}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.joinButton}
+                onPress={() => navigation.navigate(SCREENS.CALL, { appointment: appt })}>
+                <Text style={styles.joinButtonText}>Join Call</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+
+        <Text style={styles.sectionTitle}>Patients Treated</Text>
+        {loading ? (
+          <View style={styles.appointmentCard}>
+            <Text style={styles.appointmentTime}>Loading patients...</Text>
+          </View>
+        ) : patientsTreated.length === 0 ? (
+          <View style={styles.appointmentCard}>
+            <Text style={styles.appointmentTime}>No patients treated yet</Text>
+          </View>
+        ) : patientsTreated.map((patient, idx) => (
+          <View style={styles.appointmentCard} key={patient._id || idx}>
+            <View style={styles.appointmentHeader}>
+              <View>
+                <Text style={styles.patientName}>{patient.name || 'Patient'}</Text>
+                <Text style={styles.appointmentType}>Visits: {patient.visitCount !== undefined ? patient.visitCount : 0}</Text>
+                <Text style={styles.appointmentTime}>Gender: {patient.gender || 'N/A'}</Text>
+              </View>
+            </View>
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

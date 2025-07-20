@@ -312,26 +312,63 @@ const Login = ({navigation, route}) => {
     setLoading(true);
     try {
       const res = await authApi.login({ emailOrPhone: value, password });
-      if (res.data && res.data.token && res.data.user) {
-        console.log("Reached Here");
-        dispatch(loginUser({ user: res.data.user, userType: res.data.user.role }));
-        console.log("Reached Here");
-        showAlert('Login success', 'success');
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: SCREENS.DASHBOARD }],
-          })
-        );
+      const user = res.data?.data?.user;
+      const token = res.data?.data?.token;
+      const emailVerified = res.data?.data?.emailVerified;
+      // If user exists, credentials are correct
+      if (user) {
+        // Check for email verification
+        const isVerified = (user.emailVerified === true) || (emailVerified === true) || (token ? true : false);
+        if (isVerified) {
+          // Email is verified, proceed to dashboard
+          const loginPayload = { user, userType: user.role };
+          dispatch(loginUser(loginPayload));
+          try {
+            const { storeToken } = await import('../../utils/tokenStorage');
+            if (token) await storeToken(token);
+          } catch (e) {
+            console.error('Failed to store token:', e);
+          }
+          showAlert('Login successful', 'success');
+          // Navigation is now handled by the root navigator (Router.js) based on Redux state.
+        } else {
+          // Only navigate to OTP if backend message is strictly about unverified email and NOT invalid credentials
+          const msgRaw = res.data?.message || '';
+          const msg = msgRaw.toLowerCase();
+          if (msg.includes('email not verified') && !msg.includes('invalid credentials')) {
+            showAlert('Your email is not verified. Please verify your email to continue.', 'error');
+            navigation.navigate(SCREENS.OTPSCREEN, {
+              emailOrPhone: value,
+              userType: routeUserType,
+              userData: user,
+            });
+          } else {
+            // Any other case, treat as invalid credentials
+            showAlert('Invalid credentials', 'error');
+          }
+        }
       } else {
-        showAlert(res.data.message || 'Login failed', 'error');
+        // No user returned, credentials are invalid
+        showAlert('Invalid credentials', 'error');
       }
     } catch (err) {
-      showAlert(err.response?.data?.message || 'Login failed', 'error');
+      const msgRaw = err.response?.data?.message || 'Login failed';
+      const msg = msgRaw.toLowerCase();
+      // Only navigate to OTP if the error message contains 'email not verified' and NOT 'invalid credentials'
+      if (msg.includes('email not verified') && !msg.includes('invalid credentials')) {
+        showAlert('Your email is not verified. Please verify your email to continue.', 'error');
+        navigation.navigate(SCREENS.OTPSCREEN, {
+          emailOrPhone: value,
+          userType: routeUserType,
+          userData: null,
+        });
+      } else {
+        showAlert('Invalid credentials', 'error');
+      }
     } finally {
       setLoading(false);
-    }
-  };
+}
+};
 
   return (
     <SafeAreaView style={styles.container}>

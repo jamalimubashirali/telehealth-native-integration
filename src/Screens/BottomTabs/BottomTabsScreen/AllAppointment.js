@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
 import { TabView, SceneMap, TabBar, TabBarItem } from 'react-native-tab-view';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
@@ -14,6 +14,8 @@ import { Images } from '../../../assets/Images/images';
 import { title } from 'process';
 import CRBSheetComponent from '../../../components/BottomSheets/CRBSheetComponent';
 import appointmentApi from '../../../services/appointmentApi';
+import patientApi from '../../../services/patientApi';
+import { useAlert } from '../../../Providers/AlertContext';
 
 const dummyData = {
   upcoming: [
@@ -77,13 +79,75 @@ const dummyData = {
 const AllAppointment = ({ navigation }) => {
   const [index, setIndex] = useState(0);
   const { isDarkMode } = useSelector(store => store.theme);
-  const reviewSheet_Ref = useRef()
+  const { User } = useSelector(store => store.auth);
+  const { showAlert } = useAlert();
+  const reviewSheet_Ref = useRef();
+  
   const [routes] = useState([
     { key: 'upcoming', title: 'Upcoming' },
     { key: 'completed', title: 'Completed' },
     { key: 'cancelled', title: 'Cancelled' },
   ]);
+  
   const [actionLoading, setActionLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [appointmentData, setAppointmentData] = useState({
+    upcoming: [],
+    completed: [],
+    cancelled: [],
+  });
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [User]);
+
+  const fetchAppointments = async () => {
+    if (!User?.token) return;
+    
+    setLoading(true);
+    try {
+      const [upcomingRes, historyRes] = await Promise.all([
+        patientApi.getUpcomingAppointments(),
+        patientApi.getAppointmentHistory(),
+      ]);
+
+      const upcoming = upcomingRes.data.upcoming || [];
+      const history = historyRes.data.history || [];
+      
+      // Separate completed and cancelled from history
+      const completed = history.filter(apt => apt.status === 'completed');
+      const cancelled = history.filter(apt => apt.status === 'cancelled');
+
+      setAppointmentData({
+        upcoming: upcoming.map(formatAppointment),
+        completed: completed.map(formatAppointment),
+        cancelled: cancelled.map(formatAppointment),
+      });
+    } catch (err) {
+      showAlert(err.response?.data?.message || 'Failed to load appointments', 'error');
+      setAppointmentData({ upcoming: [], completed: [], cancelled: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatAppointment = (appointment) => ({
+    id: appointment._id,
+    name: appointment.doctor?.name || 'Doctor Name',
+    specialty: appointment.doctor?.specialization || 'General Practitioner',
+    date: new Date(appointment.date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }),
+    bookingId: `#${appointment._id.slice(-8).toUpperCase()}`,
+    status: appointment.status,
+    image: appointment.doctor?.avatar ? { uri: appointment.doctor.avatar } : Images.dr1,
+    rawData: appointment,
+  });
 
   const Card = ({ item, actionButtons, onPress }) => (
     <TouchableOpacity onPress={onPress} style={styles.card}>
@@ -107,14 +171,13 @@ const AllAppointment = ({ navigation }) => {
       <View style={styles.actions}>{actionButtons}</View>
     </TouchableOpacity>
   );
-
   const UpcomingTab = () => (
     <FlatList
-      data={dummyData.upcoming}
+      data={appointmentData.upcoming}
       style={{ paddingTop: hp(3) }}
       renderItem={({ item }) => (
         <Card
-        onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT)}
+        onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT, { appointment: item.rawData })}
           item={item}
           actionButtons={
             <View
@@ -136,15 +199,14 @@ const AllAppointment = ({ navigation }) => {
       keyExtractor={(item) => item.id}
     />
   );
-
   const CompletedTab = () => (
     <FlatList
-      data={dummyData.completed}
+      data={appointmentData.completed}
       style={{ paddingTop: hp(3) }}
       renderItem={({ item }) => (
         <Card
           item={item}
-          onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT)}
+          onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT, { appointment: item.rawData })}
           actionButtons={
             <>
               <CustomButton containerStyle={[styles.btn]} mode={true} text={'Re-Book'} textStyle={[styles.btnText]}  onPress={()=> navigation.navigate(SCREENS.NEWAPPOINTMENT, {title: 'Re-Book Appointment'})}/>
@@ -270,6 +332,31 @@ const AllAppointment = ({ navigation }) => {
 
     },
   });
+
+  const refreshAppointments = async () => {
+    if (!User?.token) return;
+    setLoading(true);
+    try {
+      const [upcomingRes, historyRes] = await Promise.all([
+        patientApi.getUpcomingAppointments(),
+        patientApi.getAppointmentHistory(),
+      ]);
+      const upcoming = upcomingRes.data.upcoming || [];
+      const history = historyRes.data.history || [];
+      const completed = history.filter(apt => apt.status === 'completed');
+      const cancelled = history.filter(apt => apt.status === 'cancelled');
+      setAppointmentData({
+        upcoming: upcoming.map(formatAppointment),
+        completed: completed.map(formatAppointment),
+        cancelled: cancelled.map(formatAppointment),
+      });
+    } catch (err) {
+      showAlert(err.response?.data?.message || 'Failed to load appointments', 'error');
+      setAppointmentData({ upcoming: [], completed: [], cancelled: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>

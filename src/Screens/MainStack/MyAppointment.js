@@ -41,12 +41,28 @@ const MyAppointment = () => {
         fetchAppointments();
     }, [token]);
 
+    const refreshAppointments = async () => {
+        setLoading(true);
+        try {
+            const [upcomingRes, historyRes] = await Promise.all([
+                patientApi.getUpcomingAppointments(token),
+                patientApi.getAppointmentHistory(token),
+            ]);
+            setUpcoming(upcomingRes.data.appointments || []);
+            setHistory(historyRes.data.appointments || []);
+        } catch (err) {
+            showAlert(err.response?.data?.message || 'Failed to load appointments', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleCancel = async (appointmentId) => {
         setActionLoading(true);
         try {
             await appointmentApi.cancelAppointment(appointmentId, {}, token);
             showAlert('Appointment cancelled', 'success');
-            // Refresh appointments
+            await refreshAppointments(); // Refresh after action
         } catch (err) {
             showAlert(err.response?.data?.message || 'Failed to cancel appointment', 'error');
         } finally {
@@ -58,7 +74,7 @@ const MyAppointment = () => {
         try {
             await appointmentApi.completeAppointment(appointmentId, {}, token);
             showAlert('Appointment marked as complete', 'success');
-            // Refresh appointments
+            await refreshAppointments(); // Refresh after action
         } catch (err) {
             showAlert(err.response?.data?.message || 'Failed to complete appointment', 'error');
         } finally {

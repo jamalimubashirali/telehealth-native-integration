@@ -44,16 +44,29 @@ export const updateProfile = async (req, res) => {
 
 export const changePassword = async (req, res) => {
   try {
+    console.log('changePassword request body:', req.body);
     const { oldPassword, newPassword } = req.body;
     const user = await User.findById(req.user._id);
+    console.log('User found:', user ? user._id : null);
+    if (!user) {
+      console.log('User not found for id:', req.user._id);
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (!oldPassword || !newPassword) {
+      console.log('Missing oldPassword or newPassword');
+      return res.status(400).json({ success: false, message: 'Both old and new passwords are required' });
+    }
     const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) {
+      console.log('Old password is incorrect');
       return res.status(400).json({ success: false, message: 'Old password is incorrect' });
     }
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
+    console.log('Password updated successfully for user:', user._id);
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {
+    console.error('changePassword error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -105,4 +118,4 @@ export const removeDeviceToken = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
-}; 
+};

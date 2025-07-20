@@ -170,7 +170,7 @@ const DoctorEarnings = ({navigation, route}) => {
   };
 
   const getConsultationText = () => {
-    const count = currentData.consultations;
+    const count = currentData.consultations !== undefined ? currentData.consultations : 0;
     switch (activeTab) {
       case 'daily':
         return `${count} Consultations Today`;
@@ -320,7 +320,7 @@ const DoctorEarnings = ({navigation, route}) => {
 
       <ScrollView style={styles.contentContainer}>
         <View style={styles.earningsContainer}>
-          <Text style={styles.earningsAmount}>${currentData.amount}</Text>
+          <Text style={styles.earningsAmount}>${currentData.amount !== undefined ? currentData.amount : 0}</Text>
           <Text style={styles.earningsTitle}>{getTabTitle()}</Text>
           <Text style={styles.consultationsText}>{getConsultationText()}</Text>
         </View>
@@ -329,25 +329,25 @@ const DoctorEarnings = ({navigation, route}) => {
         <View style={styles.statsContainer}>
           <StatCard
             title="Average per Consultation"
-            value={`$${currentData.averagePerConsultation}`}
+            value={`$${currentData.averagePerConsultation !== undefined ? currentData.averagePerConsultation : 0}`}
             icon="calculator"
             color={theme.primaryColor}
           />
           <StatCard
             title="Total Consultations"
-            value={currentData.consultations}
+            value={currentData.consultations !== undefined ? currentData.consultations : 0}
             icon="account-group"
             color={Colors.success}
           />
           <StatCard
             title="Growth Rate"
-            value={`+${currentData.growthRate}%`}
+            value={`+${currentData.growthRate !== undefined ? currentData.growthRate : 0}%`}
             icon="trending-up"
             color={Colors.success}
           />
           <StatCard
             title="Pending Payments"
-            value={`$${currentData.pendingPayments}`}
+            value={`$${currentData.pendingPayments !== undefined ? currentData.pendingPayments : 0}`}
             icon="clock-outline"
             color={Colors.error}
           />
@@ -355,9 +355,13 @@ const DoctorEarnings = ({navigation, route}) => {
 
         {/* Recent Transactions */}
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
-        {transactions.map(transaction => (
-          <TransactionItem key={transaction.id} item={transaction} />
-        ))}
+        {transactions.length === 0 ? (
+          <Text style={styles.consultationsText}>No transactions found.</Text>
+        ) : (
+          transactions.map(transaction => (
+            <TransactionItem key={transaction.id || transaction._id} item={transaction} />
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity} from 'react-native';
 import {Colors} from '../../../Constants/themeColors';
 import {useSelector} from 'react-redux';
@@ -16,6 +16,9 @@ import {SCREENS} from '../../../Constants/Screens';
 import {Images} from '../../../assets/Images/images';
 import FullLoader from '../../../components/Loaders';
 import CategoryTab from './../../../components/FeatureCard/FeatureCard';
+import patientApi from '../../../services/patientApi';
+import appointmentApi from '../../../services/appointmentApi';
+import { useAlert } from '../../../Providers/AlertContext';
 
 
 
@@ -158,9 +161,80 @@ const hospitals = [
 
 const Home = ({navigation}) => {
   const {isDarkMode} = useSelector(store => store.theme);
+  const { User } = useSelector(store => store.auth);
+  const { showAlert } = useAlert();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Doctors');
-  const [flatlistArray, setFlatListArray] = useState(doctors);
+  const [flatlistArray, setFlatListArray] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
+  
+  // Real data states
+  const [realDoctors, setRealDoctors] = useState([]);
+  const [realAmbulances, setRealAmbulances] = useState([]);
+  const [realPharmacies, setRealPharmacies] = useState([]);
+  const [realHospitals, setRealHospitals] = useState([]);
+
+  useEffect(() => {
+    fetchUserData();
+  }, [User]);
+
+  useEffect(() => {
+    // Update flatlist array when category changes
+    switch(selectedCategory) {
+      case 'Doctors':
+        setFlatListArray(realDoctors);
+        break;
+      case 'Ambulances':
+        setFlatListArray(realAmbulances.length ? realAmbulances : ambulances);
+        break;
+      case 'Pharmacies':
+        setFlatListArray(realPharmacies.length ? realPharmacies : pharmacies);
+        break;
+      case 'Hospitals':
+        setFlatListArray(realHospitals.length ? realHospitals : hospitals);
+        break;
+      default:
+        setFlatListArray(realDoctors);
+    }
+  }, [selectedCategory, realDoctors, realAmbulances, realPharmacies, realHospitals]);
+
+  const fetchUserData = async () => {
+    if (!User?.token) return;
+    
+    setLoading(true);
+    try {
+      // Fetch upcoming appointments for the user
+      const upcomingRes = await patientApi.getUpcomingAppointments();
+      setUpcomingAppointments(upcomingRes.data.upcoming || []);
+
+      // Fetch available doctors from the API
+      const doctorsRes = await appointmentApi.getAllAvailableDoctors();
+      const fetchedDoctors = doctorsRes.data.doctors || [];
+      setRealDoctors(fetchedDoctors);
+      
+      // Set initial flatlist to doctors
+      if (selectedCategory === 'Doctors') {
+        setFlatListArray(fetchedDoctors);
+      }
+
+      // Set empty arrays for other categories until specific APIs are implemented
+      setRealAmbulances([]);
+      setRealPharmacies([]);
+      setRealHospitals([]);
+
+    } catch (err) {
+      showAlert(err.response?.data?.message || 'Failed to load data', 'error');
+      // Fallback to empty arrays if API fails
+      setRealDoctors([]);
+      setRealAmbulances([]);
+      setRealPharmacies([]);
+      setRealHospitals([]);
+      setUpcomingAppointments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -275,13 +349,12 @@ const Home = ({navigation}) => {
   // This function returns all your header components as a single View for FlatList header
   const renderHeader = () => (
     <View>
-      {/* <FullLoader loading={true} /> */}
       {/* Header */}
       <View style={styles.rowView}>
         <View style={styles.header}>
           <Image source={Images.dr1} style={styles.doctorImage} />
           <View>
-            <Text style={styles.greeting}>Hi, Adil</Text>
+            <Text style={styles.greeting}>Hi, {User?.name || 'User'}!</Text>
             <Text style={styles.subGreeting}>How are you today?</Text>
           </View>
         </View>
@@ -346,20 +419,20 @@ const Home = ({navigation}) => {
             onPress={() => navigation.navigate(SCREENS.BOOKING)}
           />
         </View>
-        <UpcomingCard />
+        <UpcomingCard appointment={upcomingAppointments[0]} />
       </View>
 
       <View style={styles.featureRow}>
         <View style={styles.cardShadow}>
           <TouchableOpacity
             onPress={() => navigation.navigate(SCREENS.SEEALLDOCTORS)}>
-            <CategoryTab content="Find Doctors near you" imgUrl={Images.chat} />
+            <CategoryTab content={<Text>Find Doctors near you</Text>} imgUrl={Images.chat} />
           </TouchableOpacity>
         </View>
         <View style={styles.cardShadow}>
           <TouchableOpacity onPress={() => navigation.navigate(SCREENS.CALL)}>
             <CategoryTab
-              content="Instant Video Consultation"
+              content={<Text>Instant Video Consultation</Text>}
               imgUrl={Images.phone}
             />
           </TouchableOpacity>
@@ -368,7 +441,7 @@ const Home = ({navigation}) => {
 
       {/* Top Doctors */}
       <View style={styles.rowView}>
-        <Text style={styles.sectionTitle}>Top {selectedCategory}</Text>
+        <Text style={styles.sectionTitle}>Top {selectedCategory || 'Doctors'}</Text>
         <CustomButton
           text={'See all'}
           textStyle={{
@@ -381,12 +454,11 @@ const Home = ({navigation}) => {
       </View>
     </View>
   );
-
   return (
     <View style={styles.container}>
       <FlatList
         data={flatlistArray}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item._id || item.id}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={renderHeader}
         renderItem={({item}) => <DoctorCard item={item} />}
@@ -396,55 +468,3 @@ const Home = ({navigation}) => {
 };
 
 export default Home;
-
-
-
-
-
-
-      {
-        /* <View style={styles.featureRow}>
-        <CategoryTab
-          content="Find Doctors near you"
-          imgUrl={Images.chat}
-          style={{flex: 1, marginRight: 8}}
-        />
-        <CategoryTab
-          content="Instant Video Consultation"
-          imgUrl={Images.phone}
-          style={{flex: 1, marginLeft: 8}}
-        />
-      </View> */
-      }
-
-      {
-        /* 
-      <View style={[styles.rowView, { marginBottom: hp(2), paddingHorizontal: wp(6) }]} >
-        <View style={{ alignItems: 'center', justifyContent: 'center' }} >
-          <CustomButton pressedRadius={7} icon={'stethoscope'} iconSize={RFPercentage(3.2)} onPress={() => {
-            setFlatListArray(doctors)
-            setSelectedCategory('Doctors')
-          }} text={'Doctors'} textStyle={[styles.CategoryLabel, selectedCategory === 'Doctors' && styles.SelctedCategoryLabel]} containerStyle={[selectedCategory === 'Doctors' && styles.selectedCategory, { alignItems: 'center'}]} iconColor={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
-        </View>
-        <View>
-          <CustomButton pressedRadius={7} icon={'pill'} iconSize={RFPercentage(3.2)} onPress={() => {
-            setFlatListArray(pharmacies)
-            setSelectedCategory('Pharmacies')
-          }} text={'Pharmacies'} textStyle={[styles.CategoryLabel, selectedCategory === 'Pharmacies' && styles.SelctedCategoryLabel]} containerStyle={[selectedCategory === 'Pharmacies' && styles.selectedCategory, { alignItems: 'center'}]} iconColor={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
-
-        </View>
-        <View style={{ alignItems: 'center' }} >
-          <CustomButton pressedRadius={7} icon={'ambulance'} text={'Ambulances'} onPress={() => {
-            setFlatListArray(ambulances)
-            setSelectedCategory('Ambulances')
-          }} textStyle={[styles.CategoryLabel, selectedCategory === 'Ambulances' && styles.SelctedCategoryLabel]} containerStyle={[selectedCategory === 'Ambulances' && styles.selectedCategory, { alignItems: 'center'}]} iconSize={RFPercentage(3.2)} iconColor={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
-        </View>
-        <View>
-          <CustomButton pressedRadius={7} icon={'hospital-building'} onPress={() => {
-            setSelectedCategory('Hospitals')
-            setFlatListArray(hospitals)
-          }} iconSize={RFPercentage(3.2)} text={'Hospitals'} containerStyle={[selectedCategory === 'Hospitals' && styles.selectedCategory, { alignItems: 'center'}]} textStyle={[styles.CategoryLabel, selectedCategory === 'Hospitals' && styles.SelctedCategoryLabel]} iconColor={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
-        </View>
-      </View>
-      */
-      }

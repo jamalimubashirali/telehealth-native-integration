@@ -1,6 +1,6 @@
 'use client';
 
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -20,80 +20,126 @@ import {Fonts} from '../../Constants/Fonts';
 import {SCREENS} from '../../Constants/Screens';
 import StackHeader from '../../components/Header/StackHeader';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import doctorApi from '../../services/doctorApi';
+import { useAlert } from '../../Providers/AlertContext';
 
 const DoctorPatients = ({navigation, route}) => {
   const {isDarkMode} = useSelector(store => store.theme);
+  const { User } = useSelector(store => store.auth);
+  const { showAlert } = useAlert();
   const theme = isDarkMode ? Colors.darkTheme : Colors.lightTheme;
 
   // Check if coming from analytics
   const isAnalyticsView = route?.params?.filter === 'analytics';
   const screenTitle = route?.params?.title || 'My Patients';
 
-  const [patients] = useState([
-    {
-      id: 1,
-      name: 'John Doe',
-      age: 35,
-      gender: 'Male',
-      lastVisit: '2024-01-15',
-      condition: 'Hypertension',
-      phone: '+1234567890',
-      email: 'john.doe@email.com',
-      address: '123 Main St, New York, NY',
-      bloodGroup: 'O+',
-      allergies: 'Penicillin, Peanuts',
-      medicalHistory: 'Hypertension, High Cholesterol',
-      status: 'active',
-      totalVisits: 12,
-      lastPayment: '$100',
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      age: 28,
-      gender: 'Female',
-      lastVisit: '2024-01-10',
-      condition: 'Diabetes',
-      phone: '+1234567891',
-      email: 'jane.smith@email.com',
-      address: '456 Oak Ave, Los Angeles, CA',
-      bloodGroup: 'A+',
-      allergies: 'None',
-      medicalHistory: 'Type 2 Diabetes, Thyroid',
-      status: 'new',
-      totalVisits: 3,
-      lastPayment: '$80',
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      age: 42,
-      gender: 'Male',
-      lastVisit: '2024-01-08',
-      condition: 'Heart Disease',
-      phone: '+1234567892',
-      email: 'mike.johnson@email.com',
-      address: '789 Pine St, Chicago, IL',
-      bloodGroup: 'B+',
-      allergies: 'Shellfish',
-      medicalHistory: 'Coronary Artery Disease, Hypertension',
-      status: 'active',
-      totalVisits: 8,
-      lastPayment: '$120',
-    },
-  ]);
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [analytics] = useState({
-    totalPatients: 45,
-    newThisWeek: 3,
-    activePatients: 42,
-    averageAge: 35,
-    commonConditions: [
-      {name: 'Hypertension', count: 15},
-      {name: 'Diabetes', count: 12},
-      {name: 'Heart Disease', count: 8},
-    ],
-  });
+  useEffect(() => {
+    fetchPatients();
+  }, [User]);
+
+  const fetchPatients = async () => {
+    if (!User?.token) return;
+    
+    setLoading(true);
+    try {
+      // Get consultation history to extract unique patients
+      const consultationRes = await doctorApi.getConsultationHistory();
+      const consultations = consultationRes.data.appointments || [];
+      
+      // Extract unique patients from consultations
+      const uniquePatients = [];
+      const patientIds = new Set();
+      
+      consultations.forEach(consultation => {
+        if (consultation.patient && !patientIds.has(consultation.patient._id)) {
+          patientIds.add(consultation.patient._id);
+          const patientConsultations = consultations.filter(c => c.patient._id === consultation.patient._id);
+          
+          uniquePatients.push({
+            id: consultation.patient._id,
+            _id: consultation.patient._id,
+            name: consultation.patient.name,
+            age: consultation.patient.dob ? 
+              new Date().getFullYear() - new Date(consultation.patient.dob).getFullYear() : 
+              'N/A',
+            gender: consultation.patient.gender || 'Not specified',
+            lastVisit: new Date(consultation.date).toLocaleDateString(),
+            condition: consultation.diagnosis || 'General consultation',
+            phone: consultation.patient.phone || 'Not provided',
+            email: consultation.patient.email,
+            address: consultation.patient.address || 'Not provided',
+            bloodGroup: consultation.patient.healthInfo?.bloodGroup || 'Not specified',
+            allergies: consultation.patient.healthInfo?.allergies || 'None',
+            medicalHistory: consultation.patient.healthInfo?.medicalHistory || 'None',
+            status: 'active',
+            totalVisits: patientConsultations.length,
+            lastPayment: '$100', // This would come from a payments API
+          });
+        }
+      });
+      
+      setPatients(uniquePatients);
+    } catch (err) {
+      showAlert(err.response?.data?.message || 'Failed to load patients', 'error');
+      setPatients([]);
+    } finally {
+      setLoading(false);
+    }  };
+
+  // Calculate analytics from real patient data
+  const calculateAnalytics = () => {
+    if (patients.length === 0) {
+      return {
+        totalPatients: 0,
+        newThisWeek: 0,
+        activePatients: 0,
+        averageAge: 0,
+        commonConditions: [],
+      };
+    }
+
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const newThisWeek = patients.filter(patient => {
+      const lastVisitDate = new Date(patient.lastVisit);
+      return lastVisitDate >= oneWeekAgo;
+    }).length;
+
+    const activePatients = patients.filter(patient => patient.status === 'active').length;
+
+    const totalAge = patients.reduce((sum, patient) => {
+      const age = typeof patient.age === 'number' ? patient.age : 0;
+      return sum + age;
+    }, 0);
+    const averageAge = patients.length > 0 ? Math.round(totalAge / patients.length) : 0;
+
+    // Count common conditions
+    const conditionCounts = {};
+    patients.forEach(patient => {
+      if (patient.condition && patient.condition !== 'General consultation') {
+        conditionCounts[patient.condition] = (conditionCounts[patient.condition] || 0) + 1;
+      }
+    });
+
+    const commonConditions = Object.entries(conditionCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+
+    return {
+      totalPatients: patients.length,
+      newThisWeek,
+      activePatients,
+      averageAge,
+      commonConditions,
+    };
+  };
+
+  const analytics = calculateAnalytics();
 
   const PatientCard = ({item}) => (
     <TouchableOpacity
