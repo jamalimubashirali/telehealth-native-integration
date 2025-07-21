@@ -12,12 +12,16 @@ export const useLogout = () => {
     removeToken();
 
     if (navigation) {
-      navigation.dispatch(
-        CommonActions.reset({
+      // Try to navigate to Welcome if possible, fallback to reset if not
+      try {
+        navigation.navigate(SCREENS.WELCOME);
+      } catch (e) {
+        // fallback to reset if navigate fails
+        navigation.reset({
           index: 0,
-          routes: [{name: SCREENS.WELCOME}],
-        }),
-      );
+          routes: [{ name: SCREENS.WELCOME }],
+        });
+      }
     }
   };
 
@@ -32,12 +36,14 @@ export const useLogoutWithCallback = () => {
     removeToken();
 
     if (navigation) {
-      navigation.dispatch(
-        CommonActions.reset({
+      try {
+        navigation.navigate(SCREENS.WELCOME);
+      } catch (e) {
+        navigation.reset({
           index: 0,
-          routes: [{name: SCREENS.WELCOME}],
-        }),
-      );
+          routes: [{ name: SCREENS.WELCOME }],
+        });
+      }
     }
 
     if (callback) {

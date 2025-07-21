@@ -89,6 +89,20 @@ export const getAvailableDoctors = async () => {
   });
 };
 
+// Fetch doctor-admin chat (negotiation) history
+export const getDoctorAdminChat = async () => {
+  return api.get('/api/doctor/earning-negotiation', {
+    headers: await authHeaders(),
+  });
+};
+
+// Post a new message to admin (doctor side)
+export const postDoctorAdminMessage = async (message) => {
+  return api.post('/api/doctor/earning-negotiation/message', { message }, {
+    headers: await authHeaders(),
+  });
+};
+
 export default {
   getDoctorDashboard,
   getDoctorUpcomingAppointments,
@@ -101,4 +115,6 @@ export default {
   getEarningNegotiation,
   postNegotiationMessage,
   getAvailableDoctors,
+  getDoctorAdminChat,
+  postDoctorAdminMessage,
 };
