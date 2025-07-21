@@ -14,7 +14,7 @@ import { Fonts } from '../../Constants/Fonts';
 import { useSelector } from 'react-redux';
 import { Colors } from '../../Constants/themeColors';
 
-const CustomCalender = () => {
+const CustomCalender = ({ onDateSelected, highlightDays = [] }) => {
   const { isDarkMode } = useSelector(store => store.theme);
   const [currentDate, setCurrentDate] = useState(moment());
   const [selectedDate, setSelectedDate] = useState(moment().date());
@@ -53,32 +53,42 @@ const CustomCalender = () => {
   const calendarData = generateCalendarData();
 
   // Render a single date item
-  const renderDateItem = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.dateItem,
-        selectedDate === item.date && styles.selectedDateItem,
-      ]}
-      onPress={() => setSelectedDate(item.date)}
-    >
-      <Text
+  const renderDateItem = ({ item }) => {
+    // Check if this day is in highlightDays
+    const isHighlighted = highlightDays.includes(item.day);
+    return (
+      <TouchableOpacity
         style={[
-          styles.dateText,
-          selectedDate === item.date && styles.selectedDateText,
+          styles.dateItem,
+          selectedDate === item.date && styles.selectedDateItem,
+          isHighlighted && styles.highlightedDateItem,
         ]}
+        onPress={() => {
+          setSelectedDate(item.date);
+          if (onDateSelected) onDateSelected(moment(currentDate).date(item.date).toDate());
+        }}
       >
-        {item.date}
-      </Text>
-      <Text
-        style={[
-          styles.dayText,
-          selectedDate === item.date && styles.selectedDayText,
-        ]}
-      >
-        {item.day}
-      </Text>
-    </TouchableOpacity>
-  );
+        <Text
+          style={[
+            styles.dateText,
+            selectedDate === item.date && styles.selectedDateText,
+            isHighlighted && styles.highlightedDateText,
+          ]}
+        >
+          {item.date}
+        </Text>
+        <Text
+          style={[
+            styles.dayText,
+            selectedDate === item.date && styles.selectedDayText,
+            isHighlighted && styles.highlightedDayText,
+          ]}
+        >
+          {item.day}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
 
 
@@ -117,6 +127,10 @@ const CustomCalender = () => {
     selectedDateItem: {
       backgroundColor: isDarkMode?Colors.darkTheme.primaryColor: Colors.lightTheme.primaryColor,
     },
+    highlightedDateItem: {
+      backgroundColor: Colors.lightTheme.primaryColor, // Use theme blue
+      borderColor: Colors.lightTheme.primaryColor,
+    },
     dateText: {
       fontSize: RFPercentage(2.5),
       fontFamily: Fonts.Bold,
@@ -125,6 +139,9 @@ const CustomCalender = () => {
     selectedDateText: {
       color: isDarkMode? Colors.darkTheme.primaryTextColor: Colors.white,
     },
+    highlightedDateText: {
+      color: Colors.white,
+    },
     dayText: {
       fontSize: RFPercentage(1.8),
       fontFamily: Fonts.Regular,
@@ -132,6 +149,9 @@ const CustomCalender = () => {
     },
     selectedDayText: {
       color: isDarkMode? Colors.darkTheme.primaryTextColor: Colors.white,
+    },
+    highlightedDayText: {
+      color: Colors.white,
     },
   });
   return (

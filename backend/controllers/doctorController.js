@@ -207,6 +207,20 @@ export const getPublicDoctorProfile = async (req, res) => {
   }
 };
 
+// 9. Get all available doctors (for patients)
+export const getAvailableDoctors = async (req, res) => {
+  try {
+    // Only return doctors with availability set and at least one slot
+    const doctors = await User.find({
+      role: 'doctor',
+      availability: { $exists: true, $not: { $size: 0 } }
+    }).select('name email specialization qualifications avatar timezone availability');
+    res.json({ success: true, data: doctors, message: 'Available doctors fetched successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // 10. Get earning negotiation history and status for the logged-in doctor
 export const getMyEarningNegotiation = async (req, res) => {
   try {

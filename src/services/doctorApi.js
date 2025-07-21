@@ -29,7 +29,7 @@ export const getDoctorUpcomingAppointments = async () => {
 };
 
 export const getConsultationHistory = async () => {
-  return api.get('/api/doctor/appointments/history', {
+  return api.get('/api/doctor/consultations/history', {
     headers: await authHeaders(),
   });
 };
@@ -82,6 +82,13 @@ export const postNegotiationMessage = async (data) => {
   });
 };
 
+// Available Doctors
+export const getAvailableDoctors = async () => {
+  return api.get('/api/doctor/available', {
+    headers: await authHeaders(),
+  });
+};
+
 export default {
   getDoctorDashboard,
   getDoctorUpcomingAppointments,
@@ -93,4 +100,5 @@ export default {
   getDoctorNotifications,
   getEarningNegotiation,
   postNegotiationMessage,
+  getAvailableDoctors,
 };

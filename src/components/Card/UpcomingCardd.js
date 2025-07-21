@@ -1,11 +1,10 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { RFPercentage } from 'react-native-responsive-fontsize';
 import { useSelector } from 'react-redux';
 import { Colors } from '../../Constants/themeColors';
 import { Fonts } from '../../Constants/Fonts';
-// import Image from '../../assets/Images/PngImage.png';
 
 const UpcomingCard = ({ appointment }) => {
     const { isDarkMode } = useSelector(store => store.theme);
@@ -70,7 +69,17 @@ const UpcomingCard = ({ appointment }) => {
         width: wp(20),
         height: wp(20),
       },
-    });  return (
+    }); 
+    if (!appointment) {
+      return (
+        <View style={styles.cardContainer}>
+          <View style={styles.textContainer}>
+            <Text style={styles.doctorName}>No upcoming appointment scheduled</Text>
+            <Text style={styles.specialization}>Tap "See all" or "Find Doctors near you" to book your next appointment.</Text>
+          </View>
+        </View>
+      );
+    }  return (
     <View style={styles.cardContainer}>
       <View style={styles.textContainer}>
         <Text style={styles.doctorName}>{doctorName}</Text>

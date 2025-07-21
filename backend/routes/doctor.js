@@ -10,7 +10,8 @@ import {
   addConsultationNotes,
   getPublicDoctorProfile,
   getMyEarningNegotiation,
-  postMyEarningNegotiationMessage
+  postMyEarningNegotiationMessage,
+  getAvailableDoctors
 } from '../controllers/doctorController.js';
 import { body } from 'express-validator';
 
@@ -61,5 +62,7 @@ router.post('/earning-negotiation/message',
   ],
   postMyEarningNegotiationMessage
 );
+// Get all available doctors (for patients)
+router.get('/available', getAvailableDoctors);
 
 export default router;

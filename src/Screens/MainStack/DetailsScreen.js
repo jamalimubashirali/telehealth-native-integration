@@ -19,15 +19,26 @@ import { useAlert } from '../../Providers/AlertContext'
 import appointmentApi from '../../services/appointmentApi';
 
 const DetailsScreen = ({ navigation, route }) => {
-  const who = route.params.who
-  const reviewSheet_Ref = useRef()
+  const who = route.params.who;
+  const doctorId = route.params.doctorId;
+  const reviewSheet_Ref = useRef();
   const { isDarkMode } = useSelector((store) => store.theme);
-  const [review, setReview] = useState('')
+  const [review, setReview] = useState('');
   const { showAlert } = useAlert();
+  const [doctor, setDoctor] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-
-
-
+  React.useEffect(() => {
+    if (who === 'doctor' && doctorId) {
+      setLoading(true);
+      setError('');
+      appointmentApi.getDoctorPublicProfile(doctorId)
+        .then(res => setDoctor(res.data.data))
+        .catch(err => setError(err.response?.data?.message || 'Failed to load doctor details.'))
+        .finally(() => setLoading(false));
+    }
+  }, [who, doctorId]);
 
   const styles = StyleSheet.create({
     sheatHeading: {
@@ -54,21 +65,35 @@ const DetailsScreen = ({ navigation, route }) => {
 
     },
   })
+  if (loading && who === 'doctor') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Loading doctor details...</Text>
+      </View>
+    );
+  }
+  if (error && who === 'doctor') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: 'red' }}>{error}</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1 }} >
       {
-        who === 'doctor' ? <Details
+        who === 'doctor' && doctor ? <Details
           navigation={navigation}
-          title="Dr. Taiwo Abdulsalam"
-          subtitle="Oncologist"
-          profileImage={Images.dr2}
+          title={doctor.name}
+          subtitle={doctor.specialization}
+          profileImage={doctor.avatar ? { uri: doctor.avatar } : Images.dr2}
           stats={[
-            { icon: <Icon name={'people-outline'} size={RFPercentage(3)} color={'#7acefa'} />, value: '1000+', label: 'Patients', iconColor: '#7acefa' },
-            { icon: <Icon name={'workspace-premium'} size={RFPercentage(3)} color={'#e8899e'} />, value: '10 Yrs', label: 'Experience', iconColor: '#e8899e' },
-            { icon: <Icon name={'star-outline'} size={RFPercentage(3)} color={'#f7c481'} />, value: '4.5', label: 'Ratings', iconColor: '#f7c481' },
+            { icon: <Icon name={'workspace-premium'} size={RFPercentage(3)} color={'#e8899e'} />, value: doctor.qualifications || 'N/A', label: 'Qualifications', iconColor: '#e8899e' },
+            { icon: <Icon name={'star-outline'} size={RFPercentage(3)} color={'#f7c481'} />, value: doctor.rating || 'N/A', label: 'Ratings', iconColor: '#f7c481' },
           ]}
-          aboutText="Dr. Taiwo Abdulsalam is a top specialist at London Bridge Hospital at London. He has achieved several awards and recognition for his contribution and service in his own field. He is available for private consultation."
-          workingTime="Mon - Sat (08:30 AM - 09:00 PM)"
+          aboutText={doctor.qualifications || 'No additional information.'}
+          workingTime={doctor.availability && doctor.availability.length > 0 ? 'Available for appointments' : 'No availability set.'}
           communicationOptions={[
             {
               iconName: 'chat',
@@ -86,7 +111,7 @@ const DetailsScreen = ({ navigation, route }) => {
             },
           ]}
           buttonLabel="New Appointment"
-          buttonAction={() => navigation.navigate(SCREENS.NEWAPPOINTMENT, { title: 'New Appointment' })}
+          buttonAction={() => navigation.navigate(SCREENS.NEWAPPOINTMENT, { title: 'New Appointment', doctorId: doctor._id, availability: doctor.availability })}
         /> : who === 'pharmacy' ? <Details
           navigation={navigation}
           title="London Bridge Pharmacy"

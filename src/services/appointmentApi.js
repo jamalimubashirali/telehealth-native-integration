@@ -63,7 +63,7 @@ export const triggerMissedAppointments = async (data) => {
 
 // Doctor's public profile/Availability
 export const getDoctorPublicProfile = async (doctorId) => {
-  return api.get(`/api/doctors/${doctorId}/public-profile`);
+  return api.get(`/api/doctor/public/${doctorId}`);
 };
 
 // Admin audit log

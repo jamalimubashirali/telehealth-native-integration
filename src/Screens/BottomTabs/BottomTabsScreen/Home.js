@@ -17,45 +17,11 @@ import {Images} from '../../../assets/Images/images';
 import FullLoader from '../../../components/Loaders';
 import CategoryTab from './../../../components/FeatureCard/FeatureCard';
 import patientApi from '../../../services/patientApi';
-import appointmentApi from '../../../services/appointmentApi';
+import doctorApi from '../../../services/doctorApi';
 import { useAlert } from '../../../Providers/AlertContext';
 
 
 
-const doctors = [
-  {
-    id: '1',
-    name: 'Dr. Kenny Adeola',
-    specialization: 'General Practitioner',
-    rating: 4.4,
-    reviews: 54,
-    who: 'doctor',
-  },
-  {
-    id: '2',
-    name: 'Dr. Taiwo',
-    specialization: 'Gynaecologist',
-    rating: 4.5,
-    reviews: 56,
-    who: 'doctor',
-  },
-  {
-    id: '3',
-    name: 'Dr. Johnson',
-    specialization: 'Pediatrician',
-    rating: 4.8,
-    reviews: 280,
-    who: 'doctor',
-  },
-  {
-    id: '4',
-    name: 'Dr. Nkechi Okeli',
-    specialization: 'Oncologist',
-    rating: 4.3,
-    reviews: 130,
-    who: 'doctor',
-  },
-];
 const ambulances = [
   {
     id: '1',
@@ -174,6 +140,8 @@ const Home = ({navigation}) => {
   const [realAmbulances, setRealAmbulances] = useState([]);
   const [realPharmacies, setRealPharmacies] = useState([]);
   const [realHospitals, setRealHospitals] = useState([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [doctorError, setDoctorError] = useState('');
 
   useEffect(() => {
     fetchUserData();
@@ -209,15 +177,12 @@ const Home = ({navigation}) => {
       setUpcomingAppointments(upcomingRes.data.upcoming || []);
 
       // Fetch available doctors from the API
-      const doctorsRes = await appointmentApi.getAllAvailableDoctors();
+      const doctorsRes = await doctorApi.getAllDoctors();
       const fetchedDoctors = doctorsRes.data.doctors || [];
       setRealDoctors(fetchedDoctors);
-      
-      // Set initial flatlist to doctors
       if (selectedCategory === 'Doctors') {
         setFlatListArray(fetchedDoctors);
       }
-
       // Set empty arrays for other categories until specific APIs are implemented
       setRealAmbulances([]);
       setRealPharmacies([]);
@@ -225,8 +190,8 @@ const Home = ({navigation}) => {
 
     } catch (err) {
       showAlert(err.response?.data?.message || 'Failed to load data', 'error');
-      // Fallback to empty arrays if API fails
       setRealDoctors([]);
+      setFlatListArray([]);
       setRealAmbulances([]);
       setRealPharmacies([]);
       setRealHospitals([]);
@@ -419,13 +384,12 @@ const Home = ({navigation}) => {
             onPress={() => navigation.navigate(SCREENS.BOOKING)}
           />
         </View>
-        <UpcomingCard appointment={upcomingAppointments[0]} />
+        <UpcomingCard appointment={upcomingAppointments[0] || null} />
       </View>
 
       <View style={styles.featureRow}>
         <View style={styles.cardShadow}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate(SCREENS.SEEALLDOCTORS)}>
+          <TouchableOpacity onPress={() => navigation.navigate(SCREENS.SEEALLDOCTORS)}>
             <CategoryTab content={<Text>Find Doctors near you</Text>} imgUrl={Images.chat} />
           </TouchableOpacity>
         </View>
@@ -457,11 +421,18 @@ const Home = ({navigation}) => {
   return (
     <View style={styles.container}>
       <FlatList
-        data={flatlistArray}
+        data={realDoctors}
         keyExtractor={item => item._id || item.id}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={renderHeader}
         renderItem={({item}) => <DoctorCard item={item} />}
+        ListEmptyComponent={doctorError ? (
+          <View style={{alignItems: 'center', padding: 16}}>
+            <Text style={{color: isDarkMode ? Colors.darkTheme.primaryTextColor : Colors.lightTheme.primaryTextColor, fontSize: RFPercentage(2), fontFamily: Fonts.Medium}}>
+              {doctorError}
+            </Text>
+          </View>
+        ) : null}
       />
     </View>
   );
