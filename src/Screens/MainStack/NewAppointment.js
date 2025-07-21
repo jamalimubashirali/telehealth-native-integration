@@ -28,8 +28,8 @@ import { SCREENS } from '../../Constants/Screens';
 import appointmentApi from '../../services/appointmentApi';
 
 const NewAppointment = ({navigation, route}) => {
-  const title = route.params.title;
-  const doctorAvailability = route.params.availability || [];
+  const { title, doctor } = route.params;
+  const doctorAvailability = doctor.availability || [];
   const [selectedTime, setSelectedTime] = useState('');
   const [selectedGender, setSelectedGender] = useState('');
   const { isDarkMode } = useSelector(store => store.theme);
@@ -301,7 +301,7 @@ const renderDateItem = (timestamp) => {
 
   // Helper: Validate inputs
   const validateInputs = () => {
-    if (!route.params.doctorId) return 'Doctor not selected.';
+    if (!doctor._id) return 'Doctor not selected.';
     if (!selectedDate) return 'Please select a date.';
     if (!selectedTime) return 'Please select a time slot.';
     if (!pName.trim()) return 'Please enter your full name.';
@@ -421,7 +421,7 @@ const renderDateItem = (timestamp) => {
           try {
             const formattedDate = moment(selectedDate).format('YYYY-MM-DD');
             const payload = {
-              doctorId: route.params.doctorId,
+              doctorId: doctor._id,
               date: formattedDate,
               slot: selectedTime,
               patientName: pName,
@@ -434,7 +434,7 @@ const renderDateItem = (timestamp) => {
               setSuccessMsg('Appointment Scheduled Successfully');
               showAlert('Appointment Scheduled Successfully', 'success');
               setTimeout(() => {
-                title === 'Reschedule Appointment' ? navigation.navigate(SCREENS.MYAPPOINTMENT) : navigation.navigate(SCREENS.REVIEWSUMMARY);
+                title === 'Reschedule Appointment' ? navigation.navigate(SCREENS.MYAPPOINTMENT) : navigation.navigate(SCREENS.REVIEWSUMMARY, { appointment: res.data.data, doctor: doctor });
               }, 1500);
             } else {
               setErrorMsg(res.data.message || 'Failed to schedule appointment');

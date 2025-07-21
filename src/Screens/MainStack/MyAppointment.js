@@ -12,6 +12,9 @@ import { Images } from '../../assets/Images/images';
 import patientApi from '../../services/patientApi';
 import appointmentApi from '../../services/appointmentApi';
 import { useAlert } from '../../Providers/AlertContext';
+import FullLoader from '../../components/Loaders';
+import { useFocusEffect } from '@react-navigation/native';
+import CustomButton from '../../components/Buttons/customButton';
 
 const MyAppointment = () => {
     const { isDarkMode } = useSelector(store => store.theme);
@@ -22,34 +25,14 @@ const MyAppointment = () => {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
 
-    useEffect(() => {
-        const fetchAppointments = async () => {
-            setLoading(true);
-            try {
-                const [upcomingRes, historyRes] = await Promise.all([
-                    patientApi.getUpcomingAppointments(token),
-                    patientApi.getAppointmentHistory(token),
-                ]);
-                setUpcoming(upcomingRes.data.appointments || []);
-                setHistory(historyRes.data.appointments || []);
-            } catch (err) {
-                showAlert(err.response?.data?.message || 'Failed to load appointments', 'error');
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchAppointments();
-    }, [token]);
-
-    const refreshAppointments = async () => {
-        setLoading(true);
+    const fetchAppointments = async () => {
         try {
             const [upcomingRes, historyRes] = await Promise.all([
                 patientApi.getUpcomingAppointments(token),
                 patientApi.getAppointmentHistory(token),
             ]);
-            setUpcoming(upcomingRes.data.appointments || []);
-            setHistory(historyRes.data.appointments || []);
+            setUpcoming(upcomingRes.data.data.upcoming || []);
+            setHistory(historyRes.data.data.history || []);
         } catch (err) {
             showAlert(err.response?.data?.message || 'Failed to load appointments', 'error');
         } finally {
@@ -57,12 +40,28 @@ const MyAppointment = () => {
         }
     };
 
+    useFocusEffect(
+        React.useCallback(() => {
+          setLoading(true);
+        }, [])
+    );
+
+    useEffect(() => {
+        if (loading) {
+            fetchAppointments();
+        }
+    }, [loading]);
+
+    const refreshAppointments = () => {
+        setLoading(true);
+    };
+
     const handleCancel = async (appointmentId) => {
         setActionLoading(true);
         try {
             await appointmentApi.cancelAppointment(appointmentId, {}, token);
             showAlert('Appointment cancelled', 'success');
-            await refreshAppointments(); // Refresh after action
+            refreshAppointments(); // Refresh after action
         } catch (err) {
             showAlert(err.response?.data?.message || 'Failed to cancel appointment', 'error');
         } finally {
@@ -74,7 +73,7 @@ const MyAppointment = () => {
         try {
             await appointmentApi.completeAppointment(appointmentId, {}, token);
             showAlert('Appointment marked as complete', 'success');
-            await refreshAppointments(); // Refresh after action
+            refreshAppointments(); // Refresh after action
         } catch (err) {
             showAlert(err.response?.data?.message || 'Failed to complete appointment', 'error');
         } finally {
@@ -182,20 +181,10 @@ const MyAppointment = () => {
         },
     });
 
-    if (loading) {
+    if (!loading && upcoming.length === 0 && history.length === 0) {
         return (
             <View style={styles.container}>
-                <StackHeader title={'My Appointments'} headerStyle={{ paddingBottom: hp(1) }} />
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    <Text>Loading appointments...</Text>
-                </View>
-            </View>
-        );
-    }
-
-    if (upcoming.length === 0 && history.length === 0) {
-        return (
-            <View style={styles.container}>
+                <FullLoader loading={loading} />
                 <StackHeader title={'My Appointments'} headerStyle={{ paddingBottom: hp(1) }} />
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                     <Text>No appointments found.</Text>
@@ -209,87 +198,107 @@ const MyAppointment = () => {
 
     return (
         <View style={styles.container}>
+            <FullLoader loading={loading} />
             {/* Header */}
             <StackHeader title={'My Appointments'} headerStyle={{ paddingBottom: hp(1) }}  />
-
-            {/* Doctor Info */}
-            <View style={{ paddingHorizontal: wp(5), marginTop: hp(1) }} >
-                <View style={styles.doctorContainer}>
-                    <View>
-                        <Image
-                            source={Images.dr2}
-                            style={styles.doctorImage}
-                        />
-                        <TouchableOpacity style={styles.editIcon}>
-                            <Icon name="star-shooting" size={RFPercentage(2.5)} color={isDarkMode ? Colors.darkTheme.backgroundColor : Colors.lightTheme.backgroundColor} />
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.doctorDetails}>
-                        <Text style={styles.doctorName}>Dr. Kenny Adeola</Text>
-                        <Text style={styles.doctorSpeciality}>General Practitioner</Text>
-                        <View style={styles.locationContainer}>
-                            <Icon name="map-marker" size={RFPercentage(2)} color={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
-                            <Text style={styles.locationText}>Lagos, Nigeria</Text>
-                        </View>
-                        <View style={styles.ratingContainer}>
-                            <AirbnbRating
-                                count={5}
-                                showRating={false}
-                                defaultRating={5}
-                                size={RFPercentage(2)}
-                                // starImage={<Images.food1 />}
-                                // ratingContainerStyle={{marginBottom: 20, width: 50}}
-                                onFinishRating={value => {
-                                    // setRating(value);
-                                }}
+            {/* Doctor Info - Upcoming Appointment */}
+            {upcomingAppointment ? (
+                <View style={{ paddingHorizontal: wp(5), marginTop: hp(1) }} >
+                    <View style={styles.doctorContainer}>
+                        <View>
+                            <Image
+                                source={upcomingAppointment.doctor?.avatar ? { uri: upcomingAppointment.doctor.avatar } : Images.dr2}
+                                style={styles.doctorImage}
                             />
-                            <Text style={styles.reviewText}>52 Reviews</Text>
+                            <TouchableOpacity style={styles.editIcon}>
+                                <Icon name="star-shooting" size={RFPercentage(2.5)} color={isDarkMode ? Colors.darkTheme.backgroundColor : Colors.lightTheme.backgroundColor} />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.doctorDetails}>
+                            <Text style={styles.doctorName}>{upcomingAppointment.doctor?.name || 'Doctor'}</Text>
+                            <Text style={styles.doctorSpeciality}>{upcomingAppointment.doctor?.specialization || 'Specialization'}</Text>
+                            <View style={styles.locationContainer}>
+                                <Icon name="map-marker" size={RFPercentage(2)} color={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
+                                <Text style={styles.locationText}>{upcomingAppointment.doctor?.location || 'Location'}</Text>
+                            </View>
+                            <View style={styles.ratingContainer}>
+                                <AirbnbRating
+                                    count={5}
+                                    showRating={false}
+                                    defaultRating={5}
+                                    size={RFPercentage(2)}
+                                    onFinishRating={value => {}}
+                                />
+                                <Text style={styles.reviewText}>52 Reviews</Text>
+                            </View>
+                        </View>
+                    </View>
+                    {/* Appointment Info */}
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitle}>Schedule Appointment</Text>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Date</Text>
+                            <Text style={styles.infoValue}>{new Date(upcomingAppointment.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Time</Text>
+                            <Text style={styles.infoValue}>{new Date(upcomingAppointment.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Booking For</Text>
+                            <Text style={styles.infoValue}>Self</Text>
+                        </View>
+                    </View>
+                    <View style={styles.sectionContainer}>
+                        <CustomButton
+                            text={'Cancel Appointment'}
+                            onPress={() => handleCancel(upcomingAppointment._id)}
+                            disabled={actionLoading}
+                            loading={actionLoading}
+                        />
+                    </View>
+                    {/* Patient Info */}
+                    <View style={[styles.sectionContainer, {borderBottomWidth: 0}]}>
+                        <Text style={styles.sectionTitle}>Patient Info.</Text>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Full Name</Text>
+                            <Text style={styles.infoValue}>{upcomingAppointment.patientName || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Gender</Text>
+                            <Text style={styles.infoValue}>{upcomingAppointment.gender || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Age</Text>
+                            <Text style={styles.infoValue}>{upcomingAppointment.age || 'N/A'}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Problem</Text>
+                            <Text style={[styles.infoValue, { width: wp(60) }]} >{upcomingAppointment.problem || 'N/A'}</Text>
                         </View>
                     </View>
                 </View>
-
-                {/* Appointment Info */}
-                <View style={styles.sectionContainer}>
-                    <Text style={styles.sectionTitle}>Schedule Appointment</Text>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Date</Text>
-                        <Text style={styles.infoValue}>November 24, 2023</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Time</Text>
-                        <Text style={styles.infoValue}>9:00 - 9:30 (30 minutes)</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Booking For</Text>
-                        <Text style={styles.infoValue}>Self</Text>
-                    </View>
-                </View>
-
-                {/* Patient Info */}
-                <View style={[styles.sectionContainer, {borderBottomWidth: 0}]}>
-                    <Text style={styles.sectionTitle}>Patient Info.</Text>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Full Name</Text>
-                        <Text style={styles.infoValue}>Ngozi Onwuka</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Gender</Text>
-                        <Text style={styles.infoValue}>Female</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Age</Text>
-                        <Text style={styles.infoValue}>27</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Problem</Text>
-                        <Text style={[styles.infoValue, { width: wp(60) }]} >
-                            hello, doctor I need help I believe am falling sick as I am
-                            experiencing headache and body temperature.
-                        </Text>
+            ) : null}
+            {/* Past Appointment Info (History) */}
+            {pastAppointment ? (
+                <View style={{ paddingHorizontal: wp(5), marginTop: hp(1) }} >
+                    <Text style={styles.sectionTitle}>Last Appointment</Text>
+                    <View style={styles.sectionContainer}>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Doctor</Text>
+                            <Text style={styles.infoValue}>{pastAppointment.doctor?.name || 'Doctor'}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Date</Text>
+                            <Text style={styles.infoValue}>{new Date(pastAppointment.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</Text>
+                        </View>
+                        <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Status</Text>
+                            <Text style={styles.infoValue}>{pastAppointment.status || 'N/A'}</Text>
+                        </View>
                     </View>
                 </View>
-            </View>
+            ) : null}
         </View>
     );
 };

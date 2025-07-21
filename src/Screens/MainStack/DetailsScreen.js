@@ -17,6 +17,7 @@ import TxtInput from '../../components/TextInput/Txtinput'
 import CustomButton from '../../components/Buttons/customButton'
 import { useAlert } from '../../Providers/AlertContext'
 import appointmentApi from '../../services/appointmentApi';
+import FullLoader from '../../components/Loaders';
 
 const DetailsScreen = ({ navigation, route }) => {
   const who = route.params.who;
@@ -68,7 +69,7 @@ const DetailsScreen = ({ navigation, route }) => {
   if (loading && who === 'doctor') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Loading doctor details...</Text>
+        <FullLoader loading={true} />
       </View>
     );
   }
@@ -111,7 +112,7 @@ const DetailsScreen = ({ navigation, route }) => {
             },
           ]}
           buttonLabel="New Appointment"
-          buttonAction={() => navigation.navigate(SCREENS.NEWAPPOINTMENT, { title: 'New Appointment', doctorId: doctor._id, availability: doctor.availability })}
+          buttonAction={() => navigation.navigate(SCREENS.NEWAPPOINTMENT, { title: 'New Appointment', doctor: doctor })}
         /> : who === 'pharmacy' ? <Details
           navigation={navigation}
           title="London Bridge Pharmacy"

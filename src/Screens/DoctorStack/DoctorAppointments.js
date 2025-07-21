@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import {useSelector} from 'react-redux';
 import {RFPercentage} from 'react-native-responsive-fontsize';
@@ -21,6 +22,9 @@ import StackHeader from '../../components/Header/StackHeader';
 import doctorApi from '../../services/doctorApi';
 import appointmentApi from '../../services/appointmentApi';
 import { useAlert } from '../../Providers/AlertContext';
+import { useFocusEffect } from '@react-navigation/native';
+import moment from 'moment';
+import { Images } from '../../assets/Images/images';
 
 const DoctorAppointments = ({navigation}) => {
   const {isDarkMode} = useSelector(store => store.theme);
@@ -31,27 +35,34 @@ const DoctorAppointments = ({navigation}) => {
   const [appointments, setAppointments] = useState({ upcoming: [], completed: [], cancelled: [] });
   const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      setLoading(true);
-      try {
-        const [upcomingRes, completedRes] = await Promise.all([
-          doctorApi.getDoctorUpcomingAppointments(token),
-          doctorApi.getConsultationHistory(token),
-        ]);
-        setAppointments({
-          upcoming: upcomingRes.data.appointments || [],
-          completed: completedRes.data.appointments || [],
-          cancelled: [], // Add cancelled if API supports
-        });
-      } catch (err) {
-        showAlert(err.response?.data?.message || 'Failed to load appointments', 'error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAppointments();
-  }, [token]);
+  const fetchAppointments = async () => {
+    setLoading(true);
+    try {
+      const [upcomingRes, historyRes] = await Promise.all([
+        doctorApi.getDoctorUpcomingAppointments(),
+        doctorApi.getConsultationHistory(),
+      ]);
+
+      const upcoming = upcomingRes.data.data.appointments || [];
+      const history = historyRes.data.data.appointments || [];
+
+      setAppointments({
+        upcoming: upcoming,
+        completed: history.filter(appt => appt.status === 'completed'),
+        cancelled: history.filter(appt => appt.status === 'cancelled'),
+      });
+    } catch (err) {
+      showAlert(err.response?.data?.message || 'Failed to load appointments', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchAppointments();
+    }, [])
+  );
 
   const [selectedTab, setSelectedTab] = useState('upcoming');
 
@@ -90,6 +101,7 @@ const DoctorAppointments = ({navigation}) => {
       await appointmentApi.acceptAppointment(appointmentId, token);
       showAlert('Appointment accepted', 'success');
       // Refresh appointments
+      fetchAppointments();
     } catch (err) {
       showAlert(err.response?.data?.message || 'Failed to accept appointment', 'error');
     } finally {
@@ -99,9 +111,10 @@ const DoctorAppointments = ({navigation}) => {
   const handleComplete = async (appointmentId) => {
     setActionLoading(true);
     try {
-      await appointmentApi.completeAppointment(appointmentId, {}, token);
+      await appointmentApi.completeAppointment(appointmentId, {});
       showAlert('Appointment marked as complete', 'success');
       // Refresh appointments
+      fetchAppointments();
     } catch (err) {
       showAlert(err.response?.data?.message || 'Failed to complete appointment', 'error');
     } finally {
@@ -111,9 +124,10 @@ const DoctorAppointments = ({navigation}) => {
   const handleCancel = async (appointmentId) => {
     setActionLoading(true);
     try {
-      await appointmentApi.cancelAppointment(appointmentId, {}, token);
+      await appointmentApi.cancelAppointment(appointmentId, {});
       showAlert('Appointment cancelled', 'success');
       // Refresh appointments
+      fetchAppointments();
     } catch (err) {
       showAlert(err.response?.data?.message || 'Failed to cancel appointment', 'error');
     } finally {
@@ -121,42 +135,41 @@ const DoctorAppointments = ({navigation}) => {
     }
   };
 
-  const AppointmentCard = ({item}) => (
-    <View
-      style={[styles.appointmentCard, {backgroundColor: theme.secondryColor}]}>
-      <View style={styles.appointmentHeader}>
-        <View style={styles.appointmentInfo}>
-          <Text style={[styles.patientName, {color: theme.primaryTextColor}]}>
-            {item.patientName}
-          </Text>
-          <Text
-            style={[styles.appointmentTime, {color: theme.secondryTextColor}]}>
-            {item.time} • {item.date}
-          </Text>
-          <Text style={[styles.appointmentType, {color: theme.primaryColor}]}>
-            {item.type}
-          </Text>
-        </View>
-        <View style={styles.appointmentActions}>
-          <View
-            style={[
-              styles.statusBadge,
-              {backgroundColor: getStatusColor(item.status)},
-            ]}>
-            <Text style={styles.statusText}>
-              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-            </Text>
-          </View>
-          {item.status === 'confirmed' && (
-            <TouchableOpacity
-              style={[styles.actionButton, {backgroundColor: Colors.success}]}
-              onPress={() => navigation.navigate(SCREENS.CALL)}>
-              <Icon name="video" size={RFPercentage(2)} color={Colors.white} />
-            </TouchableOpacity>
-          )}
+  // Format appointment data for card UI
+  const formatAppointment = (appointment) => ({
+    id: appointment._id,
+    name: appointment.patient?.name || 'Patient Name',
+    gender: appointment.patient?.gender || 'N/A',
+    age: appointment.patient?.dob ? new Date().getFullYear() - new Date(appointment.patient.dob).getFullYear() : null,
+    date: new Date(appointment.date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }),
+    bookingId: `#${appointment._id.slice(-8).toUpperCase()}`,
+    status: appointment.status,
+    image: appointment.patient?.avatar ? { uri: appointment.patient.avatar } : Images.profile,
+    rawData: appointment,
+  });
+
+  // Patient Appointment Card UI
+  const PatientAppointmentCard = ({ item, actionButtons, onPress }) => (
+    <TouchableOpacity onPress={onPress} style={styles.card}>
+      <Text style={styles.date}>{item.date}</Text>
+      <View style={styles.cardContent}>
+        <Image source={item.image} style={styles.image} />
+        <View style={styles.details}>
+          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.specialty}>{item.gender}{item.age ? ` • Age: ${item.age}` : ''}</Text>
+          <Text style={styles.specialty}>{item.status}</Text>
+          <Text style={styles.bookingId}>Booking ID : <Text style={styles.bookingIdHighlight}>{item.bookingId}</Text></Text>
         </View>
       </View>
-    </View>
+      <View style={styles.actions}>{actionButtons}</View>
+    </TouchableOpacity>
   );
 
   const TabButton = ({tab}) => (
@@ -253,6 +266,12 @@ const DoctorAppointments = ({navigation}) => {
       borderRadius: wp(2),
       alignItems: 'center',
       justifyContent: 'center',
+      marginBottom: hp(1),
+    },
+    actionButtonText: {
+      color: Colors.white,
+      fontSize: RFPercentage(1.6),
+      fontFamily: Fonts.Medium,
     },
     emptyContainer: {
       flex: 1,
@@ -265,6 +284,57 @@ const DoctorAppointments = ({navigation}) => {
       fontFamily: Fonts.Regular,
       color: theme.secondryTextColor,
       textAlign: 'center',
+    },
+    card: {
+      backgroundColor: theme.secondryColor,
+      borderRadius: wp(3),
+      padding: wp(4),
+      marginBottom: hp(2),
+      elevation: 2,
+    },
+    date: {
+      fontSize: RFPercentage(1.8),
+      fontFamily: Fonts.Medium,
+      color: theme.secondryTextColor,
+      marginBottom: hp(1),
+    },
+    cardContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    image: {
+      width: wp(12),
+      height: wp(12),
+      borderRadius: wp(6),
+      marginRight: wp(4),
+    },
+    details: {
+      flex: 1,
+    },
+    name: {
+      fontSize: RFPercentage(2),
+      fontFamily: Fonts.Bold,
+      marginBottom: hp(0.3),
+    },
+    specialty: {
+      fontSize: RFPercentage(1.6),
+      fontFamily: Fonts.Regular,
+      color: theme.secondryTextColor,
+      marginBottom: hp(0.3),
+    },
+    bookingId: {
+      fontSize: RFPercentage(1.4),
+      fontFamily: Fonts.Regular,
+      color: theme.secondryTextColor,
+    },
+    bookingIdHighlight: {
+      fontFamily: Fonts.Bold,
+      color: theme.primaryColor,
+    },
+    actions: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: hp(1),
     },
   });
 
@@ -285,20 +355,57 @@ const DoctorAppointments = ({navigation}) => {
           <Text style={styles.emptyText}>Loading appointments...</Text>
         </View>
       ) : (
-      <FlatList
-        data={appointments[selectedTab]}
-        keyExtractor={item => item.id.toString()}
-        renderItem={({item}) => <AppointmentCard item={item} />}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              No {selectedTab} appointments found
-            </Text>
-          </View>
-        }
-      />
+        <FlatList
+          data={appointments[selectedTab].map(formatAppointment)}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <PatientAppointmentCard
+              item={item}
+              onPress={() => navigation.navigate(SCREENS.PATIENT_PROFILE, { patient: item.rawData.patient })}
+              actionButtons={
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: wp(78) }}>
+                  {item.status === 'requested' && (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.actionButton, {backgroundColor: Colors.success, marginRight: 8}]}
+                        onPress={() => handleAccept(item.id)}>
+                        <Text style={styles.actionButtonText}>Accept</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, {backgroundColor: Colors.error}]}
+                        onPress={() => handleCancel(item.id)}>
+                        <Text style={styles.actionButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  {item.status === 'accepted' && (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.actionButton, {backgroundColor: Colors.success, marginRight: 8}]}
+                        onPress={() => handleComplete(item.id)}>
+                        <Text style={styles.actionButtonText}>Complete</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, {backgroundColor: Colors.error}]}
+                        onPress={() => handleCancel(item.id)}>
+                        <Text style={styles.actionButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              }
+            />
+          )}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                No {selectedTab} appointments found
+              </Text>
+            </View>
+          }
+        />
       )}
     </SafeAreaView>
   );

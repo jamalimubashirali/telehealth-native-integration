@@ -16,65 +16,8 @@ import CRBSheetComponent from '../../../components/BottomSheets/CRBSheetComponen
 import appointmentApi from '../../../services/appointmentApi';
 import patientApi from '../../../services/patientApi';
 import { useAlert } from '../../../Providers/AlertContext';
-
-const dummyData = {
-  upcoming: [
-    {
-      id: '1',
-      name: 'Dr. Kenny Adeola',
-      specialty: 'General practitioner',
-      date: 'Nov 19, 2023 - 9:00 AM',
-      bookingId: '#12345A67B',
-      status: 'Online',
-      image: Images.dr1,
-    },
-    {
-      id: '2',
-      name: 'Dr. Taiwo Abdulsalaam',
-      specialty: 'General practitioner',
-      date: 'Nov 26, 2023 - 9:00 AM',
-      bookingId: '#48345e27C',
-      status: 'Offline',
-      image: Images.dr2,
-    },
-  ],
-  completed: [
-    {
-      id: '1',
-      name: 'Dr. Kenny Adeola',
-      specialty: 'General practitioner',
-      date: 'Nov 19, 2023 - 9:00 AM',
-      bookingId: '#12345A67B',
-      image: Images.dr3,
-    },
-    {
-      id: '2',
-      name: 'Dr. Taiwo Abdulsalaam',
-      specialty: 'General practitioner',
-      date: 'Nov 26, 2023 - 9:00 AM',
-      bookingId: '#48345e27C',
-      image: Images.dr4,
-    },
-  ],
-  cancelled: [
-    {
-      id: '1',
-      name: 'Dr. Kenny Adeola',
-      specialty: 'General practitioner',
-      date: 'Nov 19, 2023 - 9:00 AM',
-      bookingId: '#12345A67B',
-      image: Images.dr1,
-    },
-    {
-      id: '2',
-      name: 'Dr. Taiwo Abdulsalaam',
-      specialty: 'General practitioner',
-      date: 'Nov 26, 2023 - 9:00 AM',
-      bookingId: '#48345e27C',
-      image: Images.dr2,
-    },
-  ],
-};
+import FullLoader from '../../../components/Loaders';
+import { useFocusEffect } from '@react-navigation/native';
 
 const AllAppointment = ({ navigation }) => {
   const [index, setIndex] = useState(0);
@@ -97,22 +40,15 @@ const AllAppointment = ({ navigation }) => {
     cancelled: [],
   });
 
-  useEffect(() => {
-    fetchAppointments();
-  }, [User]);
-
   const fetchAppointments = async () => {
-    if (!User?.token) return;
-    
-    setLoading(true);
     try {
       const [upcomingRes, historyRes] = await Promise.all([
         patientApi.getUpcomingAppointments(),
         patientApi.getAppointmentHistory(),
       ]);
 
-      const upcoming = upcomingRes.data.upcoming || [];
-      const history = historyRes.data.history || [];
+      const upcoming = upcomingRes.data.data.upcoming || [];
+      const history = historyRes.data.data.history || [];
       
       // Separate completed and cancelled from history
       const completed = history.filter(apt => apt.status === 'completed');
@@ -131,6 +67,18 @@ const AllAppointment = ({ navigation }) => {
     }
   };
 
+  useFocusEffect(
+    React.useCallback(() => {
+      setLoading(true);
+    }, [])
+  );
+
+  useEffect(() => {
+    if (loading) {
+        fetchAppointments();
+    }
+  }, [loading, User]);
+
   const formatAppointment = (appointment) => ({
     id: appointment._id,
     name: appointment.doctor?.name || 'Doctor Name',
@@ -148,6 +96,19 @@ const AllAppointment = ({ navigation }) => {
     image: appointment.doctor?.avatar ? { uri: appointment.doctor.avatar } : Images.dr1,
     rawData: appointment,
   });
+
+  const cancelAppointment = async (appointmentId) => {
+    setActionLoading(true);
+    try {
+      await appointmentApi.cancelAppointment(appointmentId, {});
+      showAlert('Appointment cancelled successfully', 'success');
+      setLoading(true);
+    } catch (err) {
+      showAlert(err.response?.data?.message || 'Failed to cancel appointment', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const Card = ({ item, actionButtons, onPress }) => (
     <TouchableOpacity onPress={onPress} style={styles.card}>
@@ -172,71 +133,83 @@ const AllAppointment = ({ navigation }) => {
     </TouchableOpacity>
   );
   const UpcomingTab = () => (
-    <FlatList
-      data={appointmentData.upcoming}
-      style={{ paddingTop: hp(3) }}
-      renderItem={({ item }) => (
-        <Card
-        onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT, { appointment: item.rawData })}
-          item={item}
-          actionButtons={
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: wp(78),
-              }}>
-              <CustomButton containerStyle={[styles.btn]} mode={true} text={'Cancel'} textStyle={[styles.btnText]} onPress={()=>navigation.navigate(SCREENS.CANCELAPPOINTMENT)} />
-
-              <CustomButton containerStyle={[styles.btn]} text={'Reschedule'} textStyle={[styles.btnText, { color: isDarkMode ? Colors.darkTheme.primaryBtn.TextColor : Colors.lightTheme.primaryBtn.TextColor, }]}  onPress={()=> navigation.navigate(SCREENS.NEWAPPOINTMENT, {title: 'Reschedule Appointment'})}/>
-
-
-            </View>
-          }
-        />
-      )}
-      keyExtractor={(item) => item.id}
-    />
+    appointmentData.upcoming.length === 0 ? (
+      <View style={{alignItems: 'center', marginVertical: 20}}>
+        <Text>No upcoming appointments found.</Text>
+      </View>
+    ) : (
+      <FlatList
+        data={appointmentData.upcoming}
+        style={{ paddingTop: hp(3) }}
+        renderItem={({ item }) => (
+          <Card
+            onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT, { appointment: item.rawData })}
+            item={item}
+            actionButtons={
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: wp(78) }}>
+                <CustomButton containerStyle={[styles.btn]} mode={true} text={'Cancel'} textStyle={[styles.btnText]} onPress={()=>cancelAppointment(item.id)} />
+                <CustomButton containerStyle={[styles.btn]} text={'Reschedule'} textStyle={[styles.btnText, { color: isDarkMode ? Colors.darkTheme.primaryBtn.TextColor : Colors.lightTheme.primaryBtn.TextColor, }]}  onPress={()=> navigation.navigate(SCREENS.NEWAPPOINTMENT, {title: 'Reschedule Appointment', doctor: item.rawData.doctor})}/>
+              </View>
+            }
+          />
+        )}
+        keyExtractor={(item) => item.id}
+        refreshing={loading}
+        onRefresh={() => setLoading(true)}
+      />
+    )
   );
   const CompletedTab = () => (
-    <FlatList
-      data={appointmentData.completed}
-      style={{ paddingTop: hp(3) }}
-      renderItem={({ item }) => (
-        <Card
-          item={item}
-          onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT, { appointment: item.rawData })}
-          actionButtons={
-            <>
-              <CustomButton containerStyle={[styles.btn]} mode={true} text={'Re-Book'} textStyle={[styles.btnText]}  onPress={()=> navigation.navigate(SCREENS.NEWAPPOINTMENT, {title: 'Re-Book Appointment'})}/>
-
-              <CustomButton containerStyle={[styles.btn]} text={'Add a Review'} textStyle={[styles.btnText, { color: isDarkMode ? Colors.darkTheme.primaryBtn.TextColor : Colors.lightTheme.primaryBtn.TextColor, }]} />
-
-
-            </>
-          }
-        />
-      )}
-      keyExtractor={(item) => item.id}
-    />
+    appointmentData.completed.length === 0 ? (
+      <View style={{alignItems: 'center', marginVertical: 20}}>
+        <Text>No completed appointments found.</Text>
+      </View>
+    ) : (
+      <FlatList
+        data={appointmentData.completed}
+        style={{ paddingTop: hp(3) }}
+        renderItem={({ item }) => (
+          <Card
+            item={item}
+            onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT, { appointment: item.rawData })}
+            actionButtons={
+              <>
+                <CustomButton containerStyle={[styles.btn]} mode={true} text={'Re-Book'} textStyle={[styles.btnText]}  onPress={()=> navigation.navigate(SCREENS.NEWAPPOINTMENT, {title: 'Re-Book Appointment', doctor: item.rawData.doctor})}/>
+                <CustomButton containerStyle={[styles.btn]} text={'Add a Review'} textStyle={[styles.btnText, { color: isDarkMode ? Colors.darkTheme.primaryBtn.TextColor : Colors.lightTheme.primaryBtn.TextColor, }]} />
+              </>
+            }
+          />
+        )}
+        keyExtractor={(item) => item.id}
+        refreshing={loading}
+        onRefresh={() => setLoading(true)}
+      />
+    )
   );
 
   const CancelledTab = () => (
-    <FlatList
-      data={dummyData.cancelled}
-      style={{ paddingTop: hp(3) }}
-      renderItem={({ item }) => (
-        <Card
-          item={item}
-          onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT)}
-          actionButtons={
-            <CustomButton containerStyle={[styles.btn, { width: wp(80) }]} text={'Add a Review '} textStyle={[styles.btnText, { color: isDarkMode ? Colors.darkTheme.primaryBtn.TextColor : Colors.lightTheme.primaryBtn.TextColor, }]} />
-          }
-        />
-      )}
-      keyExtractor={(item) => item.id}
-    />
+    appointmentData.cancelled.length === 0 ? (
+      <View style={{alignItems: 'center', marginVertical: 20}}>
+        <Text>No cancelled appointments found.</Text>
+      </View>
+    ) : (
+      <FlatList
+        data={appointmentData.cancelled}
+        style={{ paddingTop: hp(3) }}
+        renderItem={({ item }) => (
+          <Card
+            item={item}
+            onPress={() => navigation.navigate(SCREENS.MYAPPOINTMENT, { appointment: item.rawData })}
+            actionButtons={
+              <CustomButton containerStyle={[styles.btn, { width: wp(80) }]} text={'Add a Review '} textStyle={[styles.btnText, { color: isDarkMode ? Colors.darkTheme.primaryBtn.TextColor : Colors.lightTheme.primaryBtn.TextColor, }]} />
+            }
+          />
+        )}
+        keyExtractor={(item) => item.id}
+        refreshing={loading}
+        onRefresh={() => setLoading(true)}
+      />
+    )
   );
 
   const renderScene = SceneMap({
@@ -336,30 +309,11 @@ const AllAppointment = ({ navigation }) => {
   const refreshAppointments = async () => {
     if (!User?.token) return;
     setLoading(true);
-    try {
-      const [upcomingRes, historyRes] = await Promise.all([
-        patientApi.getUpcomingAppointments(),
-        patientApi.getAppointmentHistory(),
-      ]);
-      const upcoming = upcomingRes.data.upcoming || [];
-      const history = historyRes.data.history || [];
-      const completed = history.filter(apt => apt.status === 'completed');
-      const cancelled = history.filter(apt => apt.status === 'cancelled');
-      setAppointmentData({
-        upcoming: upcoming.map(formatAppointment),
-        completed: completed.map(formatAppointment),
-        cancelled: cancelled.map(formatAppointment),
-      });
-    } catch (err) {
-      showAlert(err.response?.data?.message || 'Failed to load appointments', 'error');
-      setAppointmentData({ upcoming: [], completed: [], cancelled: [] });
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
     <View style={styles.container}>
+      <FullLoader loading={loading} />
       <StackHeader title={'All Appointments'} headerStyle={{ paddingBottom: hp(1) }} rightIcon={<Icon name='magnify' size={wp(8)} color={isDarkMode ? Colors.darkTheme.primaryTextColor : Colors.lightTheme.secondryTextColor} />} />
       <TabView
         navigationState={{ index, routes }}

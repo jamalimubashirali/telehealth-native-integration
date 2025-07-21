@@ -27,7 +27,6 @@ const styles = StyleSheet.create({
     width: wp(100),
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-
+    backgroundColor: 'rgba(255, 255, 255, 0.15)', // Reduced opacity for less white overlay
   }
 });

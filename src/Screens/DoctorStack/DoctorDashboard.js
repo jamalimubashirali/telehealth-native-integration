@@ -25,42 +25,46 @@ import {useLogout} from '../../utils/authUtils';
 import doctorApi from '../../services/doctorApi';
 import { useAlert } from '../../Providers/AlertContext';
 import { getToken } from '../../utils/tokenStorage';
+import appointmentApi from '../../services/appointmentApi';
 
 const DoctorDashboard = ({navigation}) => {
   const {isDarkMode} = useSelector(store => store.theme);
   const {User} = useSelector(store => store.auth);
   const logout = useLogout();
-  const { token } = getToken();
   const { showAlert } = useAlert();
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [dashboardStats, setDashboardStats] = useState({
-    todayAppointments: 5,
-    totalPatients: 45,
-    todayEarnings: 320,
-    monthlyEarnings: 8500,
-    pendingAppointments: 3,
-    completedToday: 2,
-    newPatients: 3, // New patients this week
-    activePatients: 42, // Currently active patients
-  });
+  const [dashboardStats, setDashboardStats] = useState({});
   const [todayAppointments, setTodayAppointments] = useState([]);
   const [patientsTreated, setPatientsTreated] = useState([]);
   const [availabilityStatus, setAvailabilityStatus] = useState('');
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   const theme = isDarkMode ? Colors.darkTheme : Colors.lightTheme;
 
+  // Fetch token on mount
   useEffect(() => {
-    fetchDashboardData();
+    (async () => {
+      const t = await getToken();
+      setToken(t);
+    })();
   }, []);
+
+  // Fetch dashboard data when token is available
+  useEffect(() => {
+    if (token) {
+      fetchDashboardData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
       // Fetch dashboard stats
       const dashboardRes = await doctorApi.getDoctorDashboard();
-      setDashboardStats(dashboardRes.data.dashboardStats || {});
-      setAvailabilityStatus(dashboardRes.data.dashboardStats?.availability || 'Unavailable');
+      setDashboardStats(dashboardRes.data.data || {});
       // Fetch today's appointments
       const upcomingRes = await doctorApi.getDoctorUpcomingAppointments();
       // Filter today's appointments by date
@@ -110,7 +114,7 @@ const DoctorDashboard = ({navigation}) => {
 
   const handleAvailability = async (status) => {
     try {
-      await doctorApi.setOrUpdateAvailability({ status }, token);
+      await doctorApi.setOrUpdateAvailability({ status });
       showAlert('Availability updated', 'success');
       fetchDashboardData();
     } catch (err) {
@@ -148,6 +152,104 @@ const DoctorDashboard = ({navigation}) => {
       </Text>
     </TouchableOpacity>
   );
+
+  // Render a single appointment card with actions
+  const renderAppointmentCard = (appt) => {
+    const status = appt.status;
+    return (
+      <View style={styles.appointmentCard} key={appt._id}>
+        <View style={styles.appointmentHeader}>
+          <View>
+            <Text style={styles.patientName}>{appt.patient?.name || 'Patient'}</Text>
+            <Text style={styles.appointmentTime}>{appt.date ? new Date(appt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Time N/A'}</Text>
+            <Text style={styles.appointmentType}>{appt.type || status || 'Consultation'}</Text>
+          </View>
+          <View style={{alignItems: 'flex-end'}}>
+            <View style={[styles.statusBadge, {backgroundColor: status === 'accepted' ? Colors.success : status === 'requested' ? Colors.error : theme.secondryTextColor}]}> 
+              <Text style={styles.statusText}>{status.charAt(0).toUpperCase() + status.slice(1)}</Text>
+            </View>
+            {/* Action Buttons */}
+            {status === 'requested' && (
+              <View style={{flexDirection: 'row', marginTop: 8}}>
+                <TouchableOpacity
+                  style={[styles.actionButton, {backgroundColor: Colors.success, marginRight: 8}]}
+                  disabled={actionLoadingId === appt._id}
+                  onPress={async () => {
+                    setActionLoadingId(appt._id);
+                    try {
+                      await appointmentApi.acceptAppointment(appt._id);
+                      showAlert('Appointment accepted', 'success');
+                      fetchDashboardData();
+                    } catch (err) {
+                      showAlert(err.response?.data?.message || 'Failed to accept appointment', 'error');
+                    } finally {
+                      setActionLoadingId(null);
+                    }
+                  }}>
+                  <Text style={{color: '#fff'}}>{actionLoadingId === appt._id ? '...' : 'Accept'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, {backgroundColor: Colors.error}]}
+                  disabled={actionLoadingId === appt._id}
+                  onPress={async () => {
+                    setActionLoadingId(appt._id);
+                    try {
+                      await appointmentApi.cancelAppointment(appt._id, {});
+                      showAlert('Appointment cancelled', 'success');
+                      fetchDashboardData();
+                    } catch (err) {
+                      showAlert(err.response?.data?.message || 'Failed to cancel appointment', 'error');
+                    } finally {
+                      setActionLoadingId(null);
+                    }
+                  }}>
+                  <Text style={{color: '#fff'}}>{actionLoadingId === appt._id ? '...' : 'Cancel'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {status === 'accepted' && (
+              <View style={{flexDirection: 'row', marginTop: 8}}>
+                <TouchableOpacity
+                  style={[styles.actionButton, {backgroundColor: Colors.success, marginRight: 8}]}
+                  disabled={actionLoadingId === appt._id}
+                  onPress={async () => {
+                    setActionLoadingId(appt._id);
+                    try {
+                      await appointmentApi.completeAppointment(appt._id, {});
+                      showAlert('Appointment marked as complete', 'success');
+                      fetchDashboardData();
+                    } catch (err) {
+                      showAlert(err.response?.data?.message || 'Failed to complete appointment', 'error');
+                    } finally {
+                      setActionLoadingId(null);
+                    }
+                  }}>
+                  <Text style={{color: '#fff'}}>{actionLoadingId === appt._id ? '...' : 'Complete'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, {backgroundColor: Colors.error}]}
+                  disabled={actionLoadingId === appt._id}
+                  onPress={async () => {
+                    setActionLoadingId(appt._id);
+                    try {
+                      await appointmentApi.cancelAppointment(appt._id, {});
+                      showAlert('Appointment cancelled', 'success');
+                      fetchDashboardData();
+                    } catch (err) {
+                      showAlert(err.response?.data?.message || 'Failed to cancel appointment', 'error');
+                    } finally {
+                      setActionLoadingId(null);
+                    }
+                  }}>
+                  <Text style={{color: '#fff'}}>{actionLoadingId === appt._id ? '...' : 'Cancel'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -305,6 +407,25 @@ const DoctorDashboard = ({navigation}) => {
       fontSize: RFPercentage(1.8),
       fontFamily: Fonts.Medium,
     },
+    statusBadge: {
+      paddingHorizontal: wp(2),
+      paddingVertical: hp(0.5),
+      borderRadius: wp(1.5),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statusText: {
+      fontSize: RFPercentage(1.4),
+      fontFamily: Fonts.Medium,
+      color: '#fff',
+    },
+    actionButton: {
+      paddingHorizontal: wp(3),
+      paddingVertical: hp(0.8),
+      borderRadius: wp(1.5),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
   });
 
   return (
@@ -347,51 +468,26 @@ const DoctorDashboard = ({navigation}) => {
 
         <View style={styles.statsContainer}>
           <StatCard
-            title="Today's Appointments"
-            value={dashboardStats.todayAppointments !== undefined ? dashboardStats.todayAppointments : 0}
+            title="Total Appointments"
+            value={dashboardStats.totalAppointments !== undefined ? dashboardStats.totalAppointments : 0}
             icon="calendar-today"
             color={theme.primaryColor}
             onPress={() => navigation.navigate(SCREENS.DOCTOR_APPOINTMENTS)}
           />
-
           <StatCard
-            title="Patient Analytics"
-            value={dashboardStats.totalPatients !== undefined ? dashboardStats.totalPatients : 0}
-            subtitle={dashboardStats.newPatients !== undefined ? `+${dashboardStats.newPatients} this week` : 'No new patients this week'}
-            icon="account-group"
+            title="Completed Appointments"
+            value={dashboardStats.completedAppointments !== undefined ? dashboardStats.completedAppointments : 0}
+            icon="check-circle"
             color={Colors.success}
-            onPress={() =>
-              navigation.navigate(SCREENS.DOCTOR_PATIENTS, {
-                filter: 'analytics',
-                title: 'Patient Analytics',
-              })
-            }
+            onPress={() => navigation.navigate(SCREENS.DOCTOR_APPOINTMENTS)}
           />
-
-          {/* <StatCard
-            title="Today's Earnings"
-            value={`$${dashboardStats.todayEarnings}`}
+          <StatCard
+            title="Earnings"
+            value={`$${dashboardStats.earnings !== undefined ? dashboardStats.earnings : 0}`}
             icon="currency-usd"
-            color={Colors.success}
-            onPress={() =>
-              navigation.navigate(SCREENS.DOCTOR_EARNINGS, {
-                defaultTab: 'daily',
-                title: 'Daily Earnings Report',
-              })
-            }
-          />
-          <StatCard
-            title="Monthly Earnings"
-            value={`$${dashboardStats.monthlyEarnings}`}
-            icon="chart-line"
             color={theme.primaryColor}
-            onPress={() =>
-              navigation.navigate(SCREENS.DOCTOR_EARNINGS, {
-                defaultTab: 'monthly',
-                title: 'Monthly Earnings Report',
-              })
-            }
-          /> */}
+            onPress={() => navigation.navigate(SCREENS.DOCTOR_EARNINGS)}
+          />
         </View>
 
         {/*-----------------Quick Actions-----------------*/}
@@ -435,22 +531,7 @@ const DoctorDashboard = ({navigation}) => {
           <View style={styles.appointmentCard}>
             <Text style={styles.appointmentTime}>No appointments for today</Text>
           </View>
-        ) : todayAppointments.map((appt, idx) => (
-          <View style={styles.appointmentCard} key={appt._id || idx}>
-            <View style={styles.appointmentHeader}>
-              <View>
-                <Text style={styles.patientName}>{appt.patient?.name || 'Patient'}</Text>
-                <Text style={styles.appointmentTime}>{appt.date ? new Date(appt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Time N/A'}</Text>
-                <Text style={styles.appointmentType}>{appt.type || appt.status || 'Consultation'}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.joinButton}
-                onPress={() => navigation.navigate(SCREENS.CALL, { appointment: appt })}>
-                <Text style={styles.joinButtonText}>Join Call</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
+        ) : todayAppointments.map(renderAppointmentCard)}
 
         <Text style={styles.sectionTitle}>Patients Treated</Text>
         {loading ? (

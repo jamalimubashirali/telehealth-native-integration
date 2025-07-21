@@ -49,15 +49,19 @@ export const getConsultationHistory = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    const total = await Appointment.countDocuments({ doctor: req.user._id, status: 'completed' });
-    const appointments = await Appointment.find({
+
+    const query = {
       doctor: req.user._id,
-      status: 'completed'
-    })
-      .populate('patient', 'name email gender dob healthInfo')
+      status: { $in: ['completed', 'cancelled'] }
+    };
+
+    const total = await Appointment.countDocuments(query);
+    const appointments = await Appointment.find(query)
+      .populate('patient', 'name email dob gender')
       .sort({ date: -1 })
       .skip(skip)
       .limit(limit);
+
     res.json({ success: true, data: { appointments, total, page, pages: Math.ceil(total / limit) }, message: 'Consultation history fetched successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

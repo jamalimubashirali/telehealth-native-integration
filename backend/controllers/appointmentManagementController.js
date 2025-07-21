@@ -104,18 +104,22 @@ export const bookAppointment = async (req, res) => {
     });
     await AuditLog.create({ user: req.user._id, action: 'book_appointment', target: 'Appointment', targetId: appointment._id, details: JSON.stringify({ doctorId, date, slot, timezone: doctor.timezone }) });
     // Send notification to doctor
-    await Notification.create({
+    Notification.create({
       user: doctorId,
       type: 'alert',
       message: `New appointment booked by patient for ${date} at ${slot}`,
       appointment: appointment._id
-    });
-    // Send email confirmation to patient and doctor
+    }).catch(() => {});
+    // Send email confirmation to patient and doctor (non-blocking)
     await sendAppointmentConfirmation(doctor, appointment, doctor, req.user);
     await sendAppointmentConfirmation(req.user, appointment, doctor, req.user);
-    // Schedule reminder (placeholder)
+    // Schedule reminder (placeholder, non-blocking)
     await scheduleAppointmentReminder(appointment);
-    res.status(201).json({ success: true, data: appointment, message: 'Appointment booked successfully' });
+    
+    // Populate doctor details before sending response
+    const populatedAppointment = await Appointment.findById(appointment._id).populate('doctor');
+    
+    res.status(201).json({ success: true, data: populatedAppointment, message: 'Appointment booked successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -259,4 +263,4 @@ export const triggerMissedAppointments = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
-}; 
+};

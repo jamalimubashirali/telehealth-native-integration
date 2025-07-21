@@ -16,47 +16,50 @@ const authHeaders = async () => {
 
 // Book Appointment (Patient)
 export const bookAppointment = async (data) => {
-  return api.post('/api/appointments', data, {
+  return api.post('/api/appointment-management/book', data, {
     headers: await authHeaders(),
   });
 };
 
 // Accept Appointment (Doctor)
 export const acceptAppointment = async (appointmentId) => {
-  return api.put(`/api/appointments/${appointmentId}/accept`, {}, {
+  return api.put(`/api/appointment-management/${appointmentId}/accept`, {}, {
     headers: await authHeaders(),
   });
 };
 
 // Complete Appointment (Doctor)
 export const completeAppointment = async (appointmentId, data) => {
-  return api.put(`/api/appointments/${appointmentId}/complete`, data, {
+  return api.put(`/api/appointment-management/${appointmentId}/complete`, data, {
     headers: await authHeaders(),
   });
 };
 
 // Cancel Appointment (Patient or Doctor)
 export const cancelAppointment = async (appointmentId, data) => {
-  return api.put(`/api/appointments/${appointmentId}/cancel`, data, {
+  return api.put(`/api/appointment-management/${appointmentId}/cancel`, data, {
     headers: await authHeaders(),
   });
 };
 
 // Get Available Slots for a Doctor
 export const getAvailableSlots = async (doctorId, date) => {
-  return api.get(`/api/doctors/${doctorId}/slots`, { params: { date } });
+  return api.get('/api/appointment-management/available-slots', {
+    params: { doctorId, date },
+    headers: await authHeaders(),
+  });
 };
 
 // Calendar Integration (Placeholder)
 export const getCalendarIntegration = async () => {
-  return api.get('/api/calendar', {
+  return api.get('/api/appointment-management/calendar', {
     headers: await authHeaders(),
   });
 };
 
 // Trigger Missed Appointments (Admin)
 export const triggerMissedAppointments = async (data) => {
-  return api.post('/api/appointments/missed', data, {
+  return api.post('/api/appointment-management/trigger-missed', data, {
     headers: await authHeaders(),
   });
 };
@@ -83,4 +86,4 @@ export default {
   triggerMissedAppointments,
   getDoctorPublicProfile,
   getAdminAuditLog,
-}; 
+};

@@ -22,6 +22,7 @@ import ThemeSetting from "../Screens/MainStack/ThemeSetting";
 import DetailsScreen from "../Screens/MainStack/DetailsScreen";
 import CallHistoryScreen from '../Screens/MainStack/Call/CallHistoryScreen';
 import CallScreen from '../Screens/MainStack/Call/CallScreen';
+import TermsAndCondition from '../Screens/auth/TermsAndCondition';
 
 const Stack = createNativeStackNavigator();
 
@@ -63,6 +64,7 @@ const MainStack = () => {
       <Stack.Screen name={SCREENS.ADDCARD} component={AddCard} />
       <Stack.Screen name={SCREENS.REVIEWSUMMARY} component={ReviewSummary} />
       <Stack.Screen name={SCREENS.PAYMENTSUCCESS} component={PaymentSuccess} />
+      <Stack.Screen name={SCREENS.TERMSANDCONDITION} component={TermsAndCondition} />
     </Stack.Navigator>
   );
 };

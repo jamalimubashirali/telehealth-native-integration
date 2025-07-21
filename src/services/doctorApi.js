@@ -29,7 +29,7 @@ export const getDoctorUpcomingAppointments = async () => {
 };
 
 export const getConsultationHistory = async () => {
-  return api.get('/api/doctor/consultations/history', {
+  return api.get('/api/doctor/appointments/history', {
     headers: await authHeaders(),
   });
 };

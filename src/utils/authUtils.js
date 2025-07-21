@@ -2,18 +2,20 @@ import {useDispatch} from 'react-redux';
 import {logoutUser} from '../redux/Slices/authSlice';
 import {CommonActions} from '@react-navigation/native';
 import {SCREENS} from '../Constants/Screens';
+import {removeToken} from './tokenStorage';
 
 export const useLogout = () => {
   const dispatch = useDispatch();
 
   const logout = (navigation = null) => {
     dispatch(logoutUser());
+    removeToken();
 
     if (navigation) {
       navigation.dispatch(
         CommonActions.reset({
           index: 0,
-          routes: [{name: SCREENS.ONBOARDING}],
+          routes: [{name: SCREENS.WELCOME}],
         }),
       );
     }
@@ -27,12 +29,13 @@ export const useLogoutWithCallback = () => {
 
   const logout = (navigation = null, callback = null) => {
     dispatch(logoutUser());
+    removeToken();
 
     if (navigation) {
       navigation.dispatch(
         CommonActions.reset({
           index: 0,
-          routes: [{name: SCREENS.ONBOARDING}],
+          routes: [{name: SCREENS.WELCOME}],
         }),
       );
     }
@@ -50,6 +53,7 @@ export const useSimpleLogout = () => {
 
   const logout = () => {
     dispatch(logoutUser());
+    removeToken();
   };
 
   return logout;

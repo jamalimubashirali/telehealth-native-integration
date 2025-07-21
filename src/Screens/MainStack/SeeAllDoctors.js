@@ -12,6 +12,7 @@ import { TouchableOpacity } from 'react-native';
 import { SCREENS } from '../../Constants/Screens';
 import { Images } from '../../assets/Images/images';
 import doctorApi from '../../services/doctorApi';
+import FullLoader from '../../components/Loaders';
 
 
 const SeeAllDoctors = ({ navigation, route }) => {
@@ -133,6 +134,7 @@ const SeeAllDoctors = ({ navigation, route }) => {
     });
     return (
         <View style={styles.container}>
+            <FullLoader loading={loading} />
             <StatusBar
                     backgroundColor={isDarkMode ? Colors.darkTheme.secondryColor : Colors.lightTheme.secondryColor}
                     barStyle={isDarkMode? 'light-content': 'dark-content'}

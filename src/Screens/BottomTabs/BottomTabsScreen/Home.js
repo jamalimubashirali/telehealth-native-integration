@@ -1,5 +1,5 @@
-import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity} from 'react-native';
+import React, {useState, useCallback, useEffect} from 'react';
+import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity, RefreshControl} from 'react-native';
 import {Colors} from '../../../Constants/themeColors';
 import {useSelector} from 'react-redux';
 import CustomButton from '../../../components/Buttons/customButton';
@@ -18,10 +18,42 @@ import FullLoader from '../../../components/Loaders';
 import CategoryTab from './../../../components/FeatureCard/FeatureCard';
 import patientApi from '../../../services/patientApi';
 import doctorApi from '../../../services/doctorApi';
-import { useAlert } from '../../../Providers/AlertContext';
 
 
-
+const doctors = [
+  {
+    id: '1',
+    name: 'Dr. Kenny Adeola',
+    specialization: 'General Practitioner',
+    rating: 4.4,
+    reviews: 54,
+    who: 'doctor',
+  },
+  {
+    id: '2',
+    name: 'Dr. Taiwo',
+    specialization: 'Gynaecologist',
+    rating: 4.5,
+    reviews: 56,
+    who: 'doctor',
+  },
+  {
+    id: '3',
+    name: 'Dr. Johnson',
+    specialization: 'Pediatrician',
+    rating: 4.8,
+    reviews: 280,
+    who: 'doctor',
+  },
+  {
+    id: '4',
+    name: 'Dr. Nkechi Okeli',
+    specialization: 'Oncologist',
+    rating: 4.3,
+    reviews: 130,
+    who: 'doctor',
+  },
+];
 const ambulances = [
   {
     id: '1',
@@ -127,79 +159,28 @@ const hospitals = [
 
 const Home = ({navigation}) => {
   const {isDarkMode} = useSelector(store => store.theme);
-  const { User } = useSelector(store => store.auth);
-  const { showAlert } = useAlert();
+  const { User } = useSelector(store => store.auth); // Get user from Redux
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Doctors');
-  const [flatlistArray, setFlatListArray] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [flatlistArray, setFlatListArray] = useState(doctors);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [upcomingAppointments, setUpcomingAppointments] = useState([]);
-  
-  // Real data states
-  const [realDoctors, setRealDoctors] = useState([]);
-  const [realAmbulances, setRealAmbulances] = useState([]);
-  const [realPharmacies, setRealPharmacies] = useState([]);
-  const [realHospitals, setRealHospitals] = useState([]);
-  const [loadingDoctors, setLoadingDoctors] = useState(false);
-  const [doctorError, setDoctorError] = useState('');
 
   useEffect(() => {
-    fetchUserData();
-  }, [User]);
-
-  useEffect(() => {
-    // Update flatlist array when category changes
-    switch(selectedCategory) {
-      case 'Doctors':
-        setFlatListArray(realDoctors);
-        break;
-      case 'Ambulances':
-        setFlatListArray(realAmbulances.length ? realAmbulances : ambulances);
-        break;
-      case 'Pharmacies':
-        setFlatListArray(realPharmacies.length ? realPharmacies : pharmacies);
-        break;
-      case 'Hospitals':
-        setFlatListArray(realHospitals.length ? realHospitals : hospitals);
-        break;
-      default:
-        setFlatListArray(realDoctors);
-    }
-  }, [selectedCategory, realDoctors, realAmbulances, realPharmacies, realHospitals]);
-
-  const fetchUserData = async () => {
-    if (!User?.token) return;
-    
-    setLoading(true);
-    try {
-      // Fetch upcoming appointments for the user
-      const upcomingRes = await patientApi.getUpcomingAppointments();
-      setUpcomingAppointments(upcomingRes.data.upcoming || []);
-
-      // Fetch available doctors from the API
-      const doctorsRes = await doctorApi.getAllDoctors();
-      const fetchedDoctors = doctorsRes.data.doctors || [];
-      setRealDoctors(fetchedDoctors);
-      if (selectedCategory === 'Doctors') {
-        setFlatListArray(fetchedDoctors);
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await patientApi.getUpcomingAppointments();
+        console.log('Upcoming Appointments:', res.data.data.upcoming);
+        setUpcomingAppointments(res.data.data.upcoming || []);
+      } catch (err) {
+        setUpcomingAppointments([]);
+      } finally {
+        setLoading(false);
       }
-      // Set empty arrays for other categories until specific APIs are implemented
-      setRealAmbulances([]);
-      setRealPharmacies([]);
-      setRealHospitals([]);
-
-    } catch (err) {
-      showAlert(err.response?.data?.message || 'Failed to load data', 'error');
-      setRealDoctors([]);
-      setFlatListArray([]);
-      setRealAmbulances([]);
-      setRealPharmacies([]);
-      setRealHospitals([]);
-      setUpcomingAppointments([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+  }, []);
 
   const styles = StyleSheet.create({
     container: {
@@ -314,12 +295,13 @@ const Home = ({navigation}) => {
   // This function returns all your header components as a single View for FlatList header
   const renderHeader = () => (
     <View>
+      {/* <FullLoader loading={true} /> */}
       {/* Header */}
       <View style={styles.rowView}>
         <View style={styles.header}>
           <Image source={Images.dr1} style={styles.doctorImage} />
           <View>
-            <Text style={styles.greeting}>Hi, {User?.name || 'User'}!</Text>
+            <Text style={styles.greeting}>Hi, {User?.name || 'User'}</Text>
             <Text style={styles.subGreeting}>How are you today?</Text>
           </View>
         </View>
@@ -384,19 +366,24 @@ const Home = ({navigation}) => {
             onPress={() => navigation.navigate(SCREENS.BOOKING)}
           />
         </View>
-        <UpcomingCard appointment={upcomingAppointments[0] || null} />
+        {upcomingAppointments.length > 0 ? (
+          <UpcomingCard appointment={upcomingAppointments[0]} />
+        ) : (
+          <UpcomingCard />
+        )}
       </View>
 
       <View style={styles.featureRow}>
         <View style={styles.cardShadow}>
-          <TouchableOpacity onPress={() => navigation.navigate(SCREENS.SEEALLDOCTORS)}>
-            <CategoryTab content={<Text>Find Doctors near you</Text>} imgUrl={Images.chat} />
+          <TouchableOpacity
+            onPress={() => navigation.navigate(SCREENS.SEEALLDOCTORS)}>
+            <CategoryTab content="Find Doctors near you" imgUrl={Images.chat} />
           </TouchableOpacity>
         </View>
         <View style={styles.cardShadow}>
           <TouchableOpacity onPress={() => navigation.navigate(SCREENS.CALL)}>
             <CategoryTab
-              content={<Text>Instant Video Consultation</Text>}
+              content="Instant Video Consultation"
               imgUrl={Images.phone}
             />
           </TouchableOpacity>
@@ -405,7 +392,7 @@ const Home = ({navigation}) => {
 
       {/* Top Doctors */}
       <View style={styles.rowView}>
-        <Text style={styles.sectionTitle}>Top {selectedCategory || 'Doctors'}</Text>
+        <Text style={styles.sectionTitle}>Top {selectedCategory}</Text>
         <CustomButton
           text={'See all'}
           textStyle={{
@@ -418,24 +405,114 @@ const Home = ({navigation}) => {
       </View>
     </View>
   );
+
+  // Simulate API fetch for dashboard data
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    // TODO: Replace with real API calls for doctors, schedule, etc.
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    setLoading(false);
+  };
+
+  // Initial load
+  React.useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  // Only fetch new data when loading is true
+  React.useEffect(() => {
+    if (loading) {
+      (async () => {
+        try {
+          // Fetch upcoming appointments
+          const res = await patientApi.getUpcomingAppointments();
+          setUpcomingAppointments(res.data.data.upcoming || []);
+          // Fetch available doctors
+        } catch (err) {
+          setUpcomingAppointments([]);
+        }
+      })();
+    }
+  }, [loading]);
+
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    setRefreshing(false);
+  }, []);
+
   return (
     <View style={styles.container}>
+      {loading && <FullLoader loading={true} />}
       <FlatList
-        data={realDoctors}
-        keyExtractor={item => item._id || item.id}
+        data={flatlistArray}
+        keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={renderHeader}
         renderItem={({item}) => <DoctorCard item={item} />}
-        ListEmptyComponent={doctorError ? (
-          <View style={{alignItems: 'center', padding: 16}}>
-            <Text style={{color: isDarkMode ? Colors.darkTheme.primaryTextColor : Colors.lightTheme.primaryTextColor, fontSize: RFPercentage(2), fontFamily: Fonts.Medium}}>
-              {doctorError}
-            </Text>
-          </View>
-        ) : null}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.lightTheme.primaryColor]}
+          />
+        }
       />
     </View>
   );
 };
 
 export default Home;
+
+
+
+
+
+
+      {
+        /* <View style={styles.featureRow}>
+        <CategoryTab
+          content="Find Doctors near you"
+          imgUrl={Images.chat}
+          style={{flex: 1, marginRight: 8}}
+        />
+        <CategoryTab
+          content="Instant Video Consultation"
+          imgUrl={Images.phone}
+          style={{flex: 1, marginLeft: 8}}
+        />
+      </View> */
+      }
+
+      {
+        /* 
+      <View style={[styles.rowView, { marginBottom: hp(2), paddingHorizontal: wp(6) }]} >
+        <View style={{ alignItems: 'center', justifyContent: 'center' }} >
+          <CustomButton pressedRadius={7} icon={'stethoscope'} iconSize={RFPercentage(3.2)} onPress={() => {
+            setFlatListArray(doctors)
+            setSelectedCategory('Doctors')
+          }} text={'Doctors'} textStyle={[styles.CategoryLabel, selectedCategory === 'Doctors' && styles.SelctedCategoryLabel]} containerStyle={[selectedCategory === 'Doctors' && styles.selectedCategory, { alignItems: 'center'}]} iconColor={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
+        </View>
+        <View>
+          <CustomButton pressedRadius={7} icon={'pill'} iconSize={RFPercentage(3.2)} onPress={() => {
+            setFlatListArray(pharmacies)
+            setSelectedCategory('Pharmacies')
+          }} text={'Pharmacies'} textStyle={[styles.CategoryLabel, selectedCategory === 'Pharmacies' && styles.SelctedCategoryLabel]} containerStyle={[selectedCategory === 'Pharmacies' && styles.selectedCategory, { alignItems: 'center'}]} iconColor={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
+
+        </View>
+        <View style={{ alignItems: 'center' }} >
+          <CustomButton pressedRadius={7} icon={'ambulance'} text={'Ambulances'} onPress={() => {
+            setFlatListArray(ambulances)
+            setSelectedCategory('Ambulances')
+          }} textStyle={[styles.CategoryLabel, selectedCategory === 'Ambulances' && styles.SelctedCategoryLabel]} containerStyle={[selectedCategory === 'Ambulances' && styles.selectedCategory, { alignItems: 'center'}]} iconSize={RFPercentage(3.2)} iconColor={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
+        </View>
+        <View>
+          <CustomButton pressedRadius={7} icon={'hospital-building'} onPress={() => {
+            setSelectedCategory('Hospitals')
+            setFlatListArray(hospitals)
+          }} iconSize={RFPercentage(3.2)} text={'Hospitals'} containerStyle={[selectedCategory === 'Hospitals' && styles.selectedCategory, { alignItems: 'center'}]} textStyle={[styles.CategoryLabel, selectedCategory === 'Hospitals' && styles.SelctedCategoryLabel]} iconColor={isDarkMode ? Colors.darkTheme.primaryColor : Colors.lightTheme.primaryColor} />
+        </View>
+      </View>
+      */
+      }
