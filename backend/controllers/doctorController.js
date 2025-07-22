@@ -49,19 +49,15 @@ export const getConsultationHistory = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-
-    const query = {
+    const total = await Appointment.countDocuments({ doctor: req.user._id, status: 'completed' });
+    const appointments = await Appointment.find({
       doctor: req.user._id,
-      status: { $in: ['completed', 'cancelled'] }
-    };
-
-    const total = await Appointment.countDocuments(query);
-    const appointments = await Appointment.find(query)
-      .populate('patient', 'name email dob gender')
+      status: 'completed'
+    })
+      .populate('patient', 'name email gender dob healthInfo')
       .sort({ date: -1 })
       .skip(skip)
       .limit(limit);
-
     res.json({ success: true, data: { appointments, total, page, pages: Math.ceil(total / limit) }, message: 'Consultation history fetched successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -220,6 +216,33 @@ export const getAvailableDoctors = async (req, res) => {
       availability: { $exists: true, $not: { $size: 0 } }
     }).select('name email specialization qualifications avatar timezone availability');
     res.json({ success: true, data: doctors, message: 'Available doctors fetched successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getDoctorsRankedByCompletedAppointments = async (req, res) => {
+  try {
+    // Aggregate completed appointments per doctor
+    const results = await Appointment.aggregate([
+      { $match: { status: 'completed' } },
+      { $group: { _id: '$doctor', completedCount: { $sum: 1 } } },
+      { $sort: { completedCount: -1 } },
+      { $limit: 10 }, // Top 10 doctors
+    ]);
+    // Get doctor details for each
+    const doctorIds = results.map(r => r._id);
+    const doctors = await User.find({ _id: { $in: doctorIds } })
+      .select('name email specialization avatar');
+    // Merge counts with doctor info
+    const rankedDoctors = results.map(r => {
+      const doc = doctors.find(d => d._id.equals(r._id));
+      return {
+        ...doc.toObject(),
+        completedAppointments: r.completedCount
+      };
+    });
+    res.json({ success: true, data: rankedDoctors });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
